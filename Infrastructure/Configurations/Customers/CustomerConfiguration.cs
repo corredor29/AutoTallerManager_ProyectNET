@@ -28,5 +28,7 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .WithOne(x => x.Customer)
             .HasForeignKey<Customer>(x => x.PersonId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Ignore(x => x.Ownerships);
     }
 }

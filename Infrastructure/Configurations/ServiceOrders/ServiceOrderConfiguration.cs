@@ -79,5 +79,9 @@ public sealed class ServiceOrderConfiguration : IEntityTypeConfiguration<Service
         builder.HasIndex(x => x.VehicleId);
         builder.HasIndex(x => x.OrderStatusId);
         builder.HasIndex(x => new { x.VehicleId, x.ClosedAt });
+
+        builder.Ignore(x => x.Parts);
+        builder.Ignore(x => x.Quotations);
+        builder.Ignore(x => x.Invoice);
     }
 }

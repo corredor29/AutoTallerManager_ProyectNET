@@ -70,5 +70,8 @@ public sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
             .WithMany(x => x.Vehicles)
             .HasForeignKey(x => x.TransmissionTypeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Ignore(x => x.Ownerships);
+        builder.Ignore(x => x.MileageHistories);
     }
 }

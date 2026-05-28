@@ -2,6 +2,7 @@ using Application.Mapping;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Api.Middleware;
+using Infrastructure.Data;
 using Infrastructure.Context;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
@@ -29,8 +30,15 @@ builder.Services.AddScoped<IVehicleService, VehicleService>();
 
 builder.Services.AddScoped<IServiceOrderRepository, ServiceOrderRepository>();
 builder.Services.AddScoped<IServiceOrderService, ServiceOrderService>();
+builder.Services.AddScoped<DatabaseInitializer>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var databaseInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+    await databaseInitializer.InitializeAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {

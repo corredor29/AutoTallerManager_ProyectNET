@@ -27,5 +27,9 @@ public sealed class PersonConfiguration : IEntityTypeConfiguration<Person>
         builder.Property(x => x.RegisteredAt)
             .HasColumnName("registered_at")
             .IsRequired();
+
+        builder.Ignore(x => x.Documents);
+        builder.Ignore(x => x.Emails);
+        builder.Ignore(x => x.Phones);
     }
 }
