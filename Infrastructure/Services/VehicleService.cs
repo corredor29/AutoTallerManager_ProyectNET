@@ -5,6 +5,7 @@ using Application.Requests.Vehicles;
 using Domain.Entities.Vehicles;
 using Domain.ValueObject.Vehicles.Vehicle;
 using Infrastructure.Context;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services
 {
@@ -33,6 +34,16 @@ namespace Infrastructure.Services
 
         public async Task<VehicleDto> CreateAsync(CreateVehicleRequest request)
         {
+            if (!await _dbContext.VehicleModels.AnyAsync(model => model.Id == request.ModelId))
+            {
+                throw new ArgumentException($"Vehicle model {request.ModelId} does not exist.");
+            }
+
+            if (await _vehicleRepository.ExistsByVinAsync(request.Vin))
+            {
+                throw new InvalidOperationException($"Vehicle VIN '{request.Vin}' is already registered.");
+            }
+
             var vehicle = new Vehicle(
                 request.ModelId,
                 new VinNumber(request.Vin),

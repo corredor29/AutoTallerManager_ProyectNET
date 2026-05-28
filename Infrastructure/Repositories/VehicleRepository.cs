@@ -36,6 +36,15 @@ namespace Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<bool> ExistsByVinAsync(string vin, int? excludeId = null)
+        {
+            var normalizedVin = vin.Trim().ToUpperInvariant();
+
+            return await _dbContext.Vehicles.AnyAsync(v =>
+                v.VIN.Value == normalizedVin &&
+                (!excludeId.HasValue || v.Id != excludeId.Value));
+        }
+
         public async Task AddAsync(Vehicle vehicle)
         {
             await _dbContext.Vehicles.AddAsync(vehicle);

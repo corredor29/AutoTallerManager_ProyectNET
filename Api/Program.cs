@@ -1,6 +1,7 @@
 using Application.Mapping;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
+using Api.Middleware;
 using Infrastructure.Context;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
@@ -26,6 +27,9 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 
+builder.Services.AddScoped<IServiceOrderRepository, ServiceOrderRepository>();
+builder.Services.AddScoped<IServiceOrderService, ServiceOrderService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -34,6 +38,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
 
 app.MapControllers();
