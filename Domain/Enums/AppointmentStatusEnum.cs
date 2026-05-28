@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 
 namespace Domain.Enums
 {
-    public enum OrderStatusEnum
+    public enum AppointmentStatusEnum
     {
-        Pending    = 1,
-        InProgress = 2,
-        Completed  = 3,
-        Cancelled  = 4
+        Pending   = 1,
+        Confirmed = 2,
+        Cancelled = 3,
+        Completed = 4
     }
 }

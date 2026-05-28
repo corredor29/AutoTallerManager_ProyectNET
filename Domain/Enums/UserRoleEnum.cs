@@ -5,11 +5,10 @@ using System.Threading.Tasks;
 
 namespace Domain.Enums
 {
-    public enum OrderStatusEnum
+    public enum UserRoleEnum
     {
-        Pending    = 1,
-        InProgress = 2,
-        Completed  = 3,
-        Cancelled  = 4
+        Admin        = 1,
+        Mechanic     = 2,
+        Receptionist = 3
     }
 }
