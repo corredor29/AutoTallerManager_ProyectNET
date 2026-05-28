@@ -3,14 +3,28 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Domain.Common;
-
+using Domain.ValueObject.Parts.MeasurementUnit;
 namespace Domain.Entities.Parts
 {
-    public class MeasurementUnit : BaseEntity
+    public sealed class MeasurementUnit : BaseEntity
     {
-        public string Name         { get; set; } = null!;
-        public string Abbreviation { get; set; } = null!;
+        public MeasurementUnitName         Name         { get; private set; } = null!;
+        public MeasurementUnitAbbreviation Abbreviation { get; private set; } = null!;
 
-        public ICollection<Part> Parts { get; set; } = [];
+        public ICollection<Part> Parts { get; private set; } = [];
+
+        private MeasurementUnit() { }
+
+        public MeasurementUnit(MeasurementUnitName name, MeasurementUnitAbbreviation abbreviation)
+        {
+            Name         = name         ?? throw new ArgumentNullException(nameof(name));
+            Abbreviation = abbreviation ?? throw new ArgumentNullException(nameof(abbreviation));
+        }
+
+        public void Update(MeasurementUnitName name, MeasurementUnitAbbreviation abbreviation)
+        {
+            Name         = name         ?? throw new ArgumentNullException(nameof(name));
+            Abbreviation = abbreviation ?? throw new ArgumentNullException(nameof(abbreviation));
+        }
     }
 }

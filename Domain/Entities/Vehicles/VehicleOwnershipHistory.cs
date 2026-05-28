@@ -4,17 +4,31 @@ using System.Linq;
 using System.Threading.Tasks;
 using Domain.Common;
 using Domain.Entities.Customers;
-
+using Domain.ValueObject.Vehicles.VehicleOwnershipHistory;
 namespace Domain.Entities.Vehicles
 {
-    public class VehicleOwnershipHistory : BaseEntity
-    {
-        public int       VehicleId  { get; set; }
-        public int       CustomerId { get; set; }
-        public DateOnly  StartDate  { get; set; }
-        public DateOnly? EndDate    { get; set; }
 
-        public Vehicle  Vehicle  { get; set; } = null!;
-        public Customer Customer { get; set; } = null!;
+    public sealed class VehicleOwnershipHistory : BaseEntity
+    {
+        public int       VehicleId  { get; private set; }
+        public int       CustomerId { get; private set; }
+        public DateRange DateRange  { get; private set; } = null!;
+
+        public Vehicle  Vehicle  { get; private set; } = null!;
+        public Customer Customer { get; private set; } = null!;
+
+        private VehicleOwnershipHistory() { }
+
+        public VehicleOwnershipHistory(int vehicleId, int customerId, DateRange dateRange)
+        {
+            VehicleId  = vehicleId  > 0 ? vehicleId  : throw new ArgumentException("VehicleId must be greater than 0.");
+            CustomerId = customerId > 0 ? customerId : throw new ArgumentException("CustomerId must be greater than 0.");
+            DateRange  = dateRange ?? throw new ArgumentNullException(nameof(dateRange));
+        }
+
+        public void Close(DateOnly endDate)
+        {
+            DateRange = new DateRange(DateRange.StartDate, endDate);
+        }
     }
 }

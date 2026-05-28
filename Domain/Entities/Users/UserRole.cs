@@ -5,12 +5,20 @@ using System.Threading.Tasks;
 
 namespace Domain.Entities.Users
 {
-    public class UserRole
+    public sealed class UserRole
     {
-        public int UserId { get; set; }
-        public int RoleId { get; set; }
+        public int UserId { get; private set; }
+        public int RoleId { get; private set; }
 
-        public User User { get; set; } = null!;
-        public Role Role { get; set; } = null!;
+        public User User { get; private set; } = null!;
+        public Role Role { get; private set; } = null!;
+
+        private UserRole() { }
+
+        public UserRole(int userId, int roleId)
+        {
+            UserId = userId > 0 ? userId : throw new ArgumentException("UserId must be greater than 0.");
+            RoleId = roleId > 0 ? roleId : throw new ArgumentException("RoleId must be greater than 0.");
+        }
     }
 }
