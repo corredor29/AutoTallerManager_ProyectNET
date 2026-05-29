@@ -53,7 +53,5 @@ public sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
 
         builder.HasIndex(x => x.TaxId)
             .IsUnique();
-
-        builder.Ignore(x => x.PurchaseOrders);
     }
 }
