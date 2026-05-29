@@ -1,6 +1,8 @@
 using Domain.Entities.ServiceOrders;
+using Domain.Entities.Quotations;
 using Domain.ValueObject.ServiceOrders.OrderStatus;
 using Domain.ValueObject.ServiceOrders.ServiceType;
+using Domain.ValueObject.Quotations.QuotationStatus;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +23,7 @@ public sealed class DatabaseInitializer
 
         await SeedOrderStatusesAsync();
         await SeedServiceTypesAsync();
+        await SeedQuotationStatusesAsync();
     }
 
     private async Task SeedOrderStatusesAsync()
@@ -57,6 +60,24 @@ public sealed class DatabaseInitializer
         };
 
         await _dbContext.ServiceTypes.AddRangeAsync(serviceTypes);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedQuotationStatusesAsync()
+    {
+        if (await _dbContext.QuotationStatuses.AnyAsync())
+        {
+            return;
+        }
+
+        var quotationStatuses = new[]
+        {
+            new QuotationStatus(new QuotationStatusName("Pending")),
+            new QuotationStatus(new QuotationStatusName("Accepted")),
+            new QuotationStatus(new QuotationStatusName("Rejected"))
+        };
+
+        await _dbContext.QuotationStatuses.AddRangeAsync(quotationStatuses);
         await _dbContext.SaveChangesAsync();
     }
 }

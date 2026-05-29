@@ -48,12 +48,20 @@ public sealed class Quotation : BaseEntity
     public void Accept()
     {
         RespondedAt = DateTime.UtcNow;
+        RejectionReason = new RejectionReason(null);
     }
 
     public void Reject(RejectionReason reason)
     {
         RejectionReason = reason ?? throw new ArgumentNullException(nameof(reason));
         RespondedAt     = DateTime.UtcNow;
+    }
+
+    public void ChangeStatus(int quotationStatusId)
+    {
+        QuotationStatusId = quotationStatusId > 0
+            ? quotationStatusId
+            : throw new ArgumentException("QuotationStatusId must be greater than 0.");
     }
 
     public void Update(LaborCost laborCost, QuotationSubtotal subtotal,
