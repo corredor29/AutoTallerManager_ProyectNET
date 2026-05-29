@@ -79,11 +79,7 @@ namespace Infrastructure.Context
             modelBuilder.Ignore<Role>();
             modelBuilder.Ignore<VehicleOwnershipHistory>();
             modelBuilder.Ignore<MileageHistory>();
-            modelBuilder.Ignore<PartCategory>();
-            modelBuilder.Ignore<MeasurementUnit>();
-            modelBuilder.Ignore<Part>();
             modelBuilder.Ignore<ServiceOrderPart>();
-            modelBuilder.Ignore<QuotationDetail>();
             modelBuilder.Ignore<Supplier>();
             modelBuilder.Ignore<PartSupplier>();
             modelBuilder.Ignore<PurchaseOrderStatus>();

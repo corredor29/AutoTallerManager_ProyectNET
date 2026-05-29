@@ -34,11 +34,20 @@ builder.Services.AddScoped<IServiceTypeService, ServiceTypeService>();
 builder.Services.AddScoped<IServiceOrderRepository, ServiceOrderRepository>();
 builder.Services.AddScoped<IServiceOrderService, ServiceOrderService>();
 
+builder.Services.AddScoped<IPartCategoryRepository, PartCategoryRepository>();
+builder.Services.AddScoped<IPartCategoryService, PartCategoryService>();
+
+builder.Services.AddScoped<IMeasurementUnitRepository, MeasurementUnitRepository>();
+builder.Services.AddScoped<IMeasurementUnitService, MeasurementUnitService>();
+
 builder.Services.AddScoped<IQuotationStatusRepository, QuotationStatusRepository>();
 builder.Services.AddScoped<IQuotationStatusService, QuotationStatusService>();
 
 builder.Services.AddScoped<IQuotationRepository, QuotationRepository>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
+
+builder.Services.AddScoped<IQuotationDetailRepository, QuotationDetailRepository>();
+builder.Services.AddScoped<IQuotationDetailService, QuotationDetailService>();
 
 builder.Services.AddScoped<DatabaseInitializer>();
 
