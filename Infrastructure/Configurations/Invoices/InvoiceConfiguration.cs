@@ -67,6 +67,5 @@ public sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.HasIndex(x => x.QuotationId)
             .IsUnique();
 
-        builder.Ignore(x => x.Payments);
     }
 }
