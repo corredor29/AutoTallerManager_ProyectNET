@@ -80,6 +80,5 @@ public sealed class QuotationConfiguration : IEntityTypeConfiguration<Quotation>
         builder.HasIndex(x => x.CreatedByUserId);
         builder.HasIndex(x => x.QuotationStatusId);
 
-        builder.Ignore(x => x.Invoice);
     }
 }

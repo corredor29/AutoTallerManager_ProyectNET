@@ -42,12 +42,13 @@ public sealed class Invoice : BaseEntity
     }
 
     public void Update(InvoiceLaborCost laborCost, InvoiceSubtotal subtotal,
-                       InvoiceTax tax, InvoiceTotal total)
+                       InvoiceTax tax, InvoiceTotal total, bool diagnosisOnlyCharged)
     {
         LaborCost = laborCost ?? throw new ArgumentNullException(nameof(laborCost));
         Subtotal  = subtotal  ?? throw new ArgumentNullException(nameof(subtotal));
         Tax       = tax       ?? throw new ArgumentNullException(nameof(tax));
         Total     = total     ?? throw new ArgumentNullException(nameof(total));
+        DiagnosisOnlyCharged = diagnosisOnlyCharged;
     }
 }
 }

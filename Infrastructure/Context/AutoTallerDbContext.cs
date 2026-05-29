@@ -79,8 +79,6 @@ namespace Infrastructure.Context
             modelBuilder.Ignore<Role>();
             modelBuilder.Ignore<VehicleOwnershipHistory>();
             modelBuilder.Ignore<MileageHistory>();
-            modelBuilder.Ignore<Invoice>();
-            modelBuilder.Ignore<InvoiceDetail>();
             modelBuilder.Ignore<PaymentMethod>();
             modelBuilder.Ignore<Payment>();
             modelBuilder.Ignore<AuditActionType>();
