@@ -68,6 +68,36 @@ namespace Infrastructure.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Ignore<PersonDocument>();
+            modelBuilder.Ignore<DocumentType>();
+            modelBuilder.Ignore<EmailDomain>();
+            modelBuilder.Ignore<PersonEmail>();
+            modelBuilder.Ignore<PhoneCode>();
+            modelBuilder.Ignore<PersonPhone>();
+            modelBuilder.Ignore<UserRole>();
+            modelBuilder.Ignore<Role>();
+            modelBuilder.Ignore<VehicleOwnershipHistory>();
+            modelBuilder.Ignore<MileageHistory>();
+            modelBuilder.Ignore<PartCategory>();
+            modelBuilder.Ignore<MeasurementUnit>();
+            modelBuilder.Ignore<Part>();
+            modelBuilder.Ignore<ServiceOrderPart>();
+            modelBuilder.Ignore<QuotationStatus>();
+            modelBuilder.Ignore<Quotation>();
+            modelBuilder.Ignore<QuotationDetail>();
+            modelBuilder.Ignore<Supplier>();
+            modelBuilder.Ignore<PartSupplier>();
+            modelBuilder.Ignore<PurchaseOrderStatus>();
+            modelBuilder.Ignore<PurchaseOrder>();
+            modelBuilder.Ignore<PurchaseOrderDetail>();
+            modelBuilder.Ignore<Invoice>();
+            modelBuilder.Ignore<InvoiceDetail>();
+            modelBuilder.Ignore<PaymentMethod>();
+            modelBuilder.Ignore<Payment>();
+            modelBuilder.Ignore<AuditActionType>();
+            modelBuilder.Ignore<AuditLog>();
+
             modelBuilder.ApplyConfigurationsFromAssembly(
                 typeof(AutoTallerDbContext).Assembly
             );
