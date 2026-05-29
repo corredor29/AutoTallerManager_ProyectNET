@@ -1,10 +1,12 @@
 using Domain.Entities.ServiceOrders;
 using Domain.Entities.Quotations;
 using Domain.Entities.Suppliers;
+using Domain.Entities.Invoices;
 using Domain.ValueObject.ServiceOrders.OrderStatus;
 using Domain.ValueObject.ServiceOrders.ServiceType;
 using Domain.ValueObject.Quotations.QuotationStatus;
 using Domain.ValueObject.Suppliers.PurchaseOrderStatus;
+using Domain.ValueObject.Invoices.PaymentMethod;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,6 +29,7 @@ public sealed class DatabaseInitializer
         await SeedServiceTypesAsync();
         await SeedQuotationStatusesAsync();
         await SeedPurchaseOrderStatusesAsync();
+        await SeedPaymentMethodsAsync();
     }
 
     private async Task SeedOrderStatusesAsync()
@@ -100,6 +103,25 @@ public sealed class DatabaseInitializer
         };
 
         await _dbContext.PurchaseOrderStatuses.AddRangeAsync(purchaseOrderStatuses);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedPaymentMethodsAsync()
+    {
+        if (await _dbContext.PaymentMethods.AnyAsync())
+        {
+            return;
+        }
+
+        var paymentMethods = new[]
+        {
+            new PaymentMethod(new PaymentMethodName("Cash")),
+            new PaymentMethod(new PaymentMethodName("Credit Card")),
+            new PaymentMethod(new PaymentMethodName("Debit Card")),
+            new PaymentMethod(new PaymentMethodName("Bank Transfer"))
+        };
+
+        await _dbContext.PaymentMethods.AddRangeAsync(paymentMethods);
         await _dbContext.SaveChangesAsync();
     }
 }
