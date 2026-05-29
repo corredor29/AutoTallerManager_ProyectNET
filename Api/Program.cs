@@ -46,6 +46,12 @@ builder.Services.AddScoped<IPartService, PartService>();
 builder.Services.AddScoped<IServiceOrderPartRepository, ServiceOrderPartRepository>();
 builder.Services.AddScoped<IServiceOrderPartService, ServiceOrderPartService>();
 
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+
+builder.Services.AddScoped<IPartSupplierRepository, PartSupplierRepository>();
+builder.Services.AddScoped<IPartSupplierService, PartSupplierService>();
+
 builder.Services.AddScoped<IQuotationStatusRepository, QuotationStatusRepository>();
 builder.Services.AddScoped<IQuotationStatusService, QuotationStatusService>();
 

@@ -79,8 +79,6 @@ namespace Infrastructure.Context
             modelBuilder.Ignore<Role>();
             modelBuilder.Ignore<VehicleOwnershipHistory>();
             modelBuilder.Ignore<MileageHistory>();
-            modelBuilder.Ignore<Supplier>();
-            modelBuilder.Ignore<PartSupplier>();
             modelBuilder.Ignore<PurchaseOrderStatus>();
             modelBuilder.Ignore<PurchaseOrder>();
             modelBuilder.Ignore<PurchaseOrderDetail>();
