@@ -67,7 +67,6 @@ public sealed class PartConfiguration : IEntityTypeConfiguration<Part>
         builder.HasIndex(x => x.PartCategoryId);
         builder.HasIndex(x => x.UnitId);
 
-        builder.Ignore(x => x.OrderParts);
         builder.Ignore(x => x.PartSuppliers);
     }
 }

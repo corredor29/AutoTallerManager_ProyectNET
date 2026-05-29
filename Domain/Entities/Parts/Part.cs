@@ -43,11 +43,18 @@ namespace Domain.Entities.Parts
             IsActive       = true;
         }
 
-        public void Update(PartDescription description, PartUnitPrice unitPrice, int? unitId)
+        public void Update(int partCategoryId, PartCode code, PartDescription description,
+                           PartStock stock, PartMinStock minStock, PartUnitPrice unitPrice,
+                           int? unitId, bool isActive)
         {
+            PartCategoryId = partCategoryId > 0 ? partCategoryId : throw new ArgumentException("PartCategoryId must be greater than 0.");
+            Code = code ?? throw new ArgumentNullException(nameof(code));
             Description = description ?? throw new ArgumentNullException(nameof(description));
-            UnitPrice   = unitPrice   ?? throw new ArgumentNullException(nameof(unitPrice));
-            UnitId      = unitId;
+            Stock = stock ?? throw new ArgumentNullException(nameof(stock));
+            MinStock = minStock ?? throw new ArgumentNullException(nameof(minStock));
+            UnitPrice = unitPrice ?? throw new ArgumentNullException(nameof(unitPrice));
+            UnitId = unitId;
+            IsActive = isActive;
         }
 
         public void AddStock(PartStock quantity)

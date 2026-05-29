@@ -40,6 +40,12 @@ builder.Services.AddScoped<IPartCategoryService, PartCategoryService>();
 builder.Services.AddScoped<IMeasurementUnitRepository, MeasurementUnitRepository>();
 builder.Services.AddScoped<IMeasurementUnitService, MeasurementUnitService>();
 
+builder.Services.AddScoped<IPartRepository, PartRepository>();
+builder.Services.AddScoped<IPartService, PartService>();
+
+builder.Services.AddScoped<IServiceOrderPartRepository, ServiceOrderPartRepository>();
+builder.Services.AddScoped<IServiceOrderPartService, ServiceOrderPartService>();
+
 builder.Services.AddScoped<IQuotationStatusRepository, QuotationStatusRepository>();
 builder.Services.AddScoped<IQuotationStatusService, QuotationStatusService>();
 
