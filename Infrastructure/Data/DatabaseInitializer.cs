@@ -1,8 +1,10 @@
 using Domain.Entities.ServiceOrders;
 using Domain.Entities.Quotations;
+using Domain.Entities.Suppliers;
 using Domain.ValueObject.ServiceOrders.OrderStatus;
 using Domain.ValueObject.ServiceOrders.ServiceType;
 using Domain.ValueObject.Quotations.QuotationStatus;
+using Domain.ValueObject.Suppliers.PurchaseOrderStatus;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +26,7 @@ public sealed class DatabaseInitializer
         await SeedOrderStatusesAsync();
         await SeedServiceTypesAsync();
         await SeedQuotationStatusesAsync();
+        await SeedPurchaseOrderStatusesAsync();
     }
 
     private async Task SeedOrderStatusesAsync()
@@ -78,6 +81,25 @@ public sealed class DatabaseInitializer
         };
 
         await _dbContext.QuotationStatuses.AddRangeAsync(quotationStatuses);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedPurchaseOrderStatusesAsync()
+    {
+        if (await _dbContext.PurchaseOrderStatuses.AnyAsync())
+        {
+            return;
+        }
+
+        var purchaseOrderStatuses = new[]
+        {
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Pending")),
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Sent")),
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Received")),
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Cancelled"))
+        };
+
+        await _dbContext.PurchaseOrderStatuses.AddRangeAsync(purchaseOrderStatuses);
         await _dbContext.SaveChangesAsync();
     }
 }
