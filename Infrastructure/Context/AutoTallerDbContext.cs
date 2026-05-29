@@ -83,8 +83,6 @@ namespace Infrastructure.Context
             modelBuilder.Ignore<MeasurementUnit>();
             modelBuilder.Ignore<Part>();
             modelBuilder.Ignore<ServiceOrderPart>();
-            modelBuilder.Ignore<QuotationStatus>();
-            modelBuilder.Ignore<Quotation>();
             modelBuilder.Ignore<QuotationDetail>();
             modelBuilder.Ignore<Supplier>();
             modelBuilder.Ignore<PartSupplier>();
