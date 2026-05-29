@@ -34,11 +34,53 @@ builder.Services.AddScoped<IServiceTypeService, ServiceTypeService>();
 builder.Services.AddScoped<IServiceOrderRepository, ServiceOrderRepository>();
 builder.Services.AddScoped<IServiceOrderService, ServiceOrderService>();
 
+builder.Services.AddScoped<IPartCategoryRepository, PartCategoryRepository>();
+builder.Services.AddScoped<IPartCategoryService, PartCategoryService>();
+
+builder.Services.AddScoped<IMeasurementUnitRepository, MeasurementUnitRepository>();
+builder.Services.AddScoped<IMeasurementUnitService, MeasurementUnitService>();
+
+builder.Services.AddScoped<IPartRepository, PartRepository>();
+builder.Services.AddScoped<IPartService, PartService>();
+
+builder.Services.AddScoped<IServiceOrderPartRepository, ServiceOrderPartRepository>();
+builder.Services.AddScoped<IServiceOrderPartService, ServiceOrderPartService>();
+
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+
+builder.Services.AddScoped<IPartSupplierRepository, PartSupplierRepository>();
+builder.Services.AddScoped<IPartSupplierService, PartSupplierService>();
+
+builder.Services.AddScoped<IPurchaseOrderStatusRepository, PurchaseOrderStatusRepository>();
+builder.Services.AddScoped<IPurchaseOrderStatusService, PurchaseOrderStatusService>();
+
+builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+
+builder.Services.AddScoped<IPurchaseOrderDetailRepository, PurchaseOrderDetailRepository>();
+builder.Services.AddScoped<IPurchaseOrderDetailService, PurchaseOrderDetailService>();
+
+builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+
+builder.Services.AddScoped<IInvoiceDetailRepository, InvoiceDetailRepository>();
+builder.Services.AddScoped<IInvoiceDetailService, InvoiceDetailService>();
+
+builder.Services.AddScoped<IPaymentMethodRepository, PaymentMethodRepository>();
+builder.Services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+
 builder.Services.AddScoped<IQuotationStatusRepository, QuotationStatusRepository>();
 builder.Services.AddScoped<IQuotationStatusService, QuotationStatusService>();
 
 builder.Services.AddScoped<IQuotationRepository, QuotationRepository>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
+
+builder.Services.AddScoped<IQuotationDetailRepository, QuotationDetailRepository>();
+builder.Services.AddScoped<IQuotationDetailService, QuotationDetailService>();
 
 builder.Services.AddScoped<DatabaseInitializer>();
 

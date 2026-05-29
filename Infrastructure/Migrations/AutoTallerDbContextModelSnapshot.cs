@@ -47,6 +47,7 @@ namespace Infrastructure.Migrations
                         .HasColumnName("customer_id");
 
                     b.Property<string>("Notes")
+                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notes");
@@ -120,6 +121,293 @@ namespace Infrastructure.Migrations
                     b.ToTable("customers", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.Invoices.Invoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("DiagnosisOnlyCharged")
+                        .HasColumnType("boolean")
+                        .HasColumnName("diagnosis_only_charged");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<decimal>("LaborCost")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("labor_cost");
+
+                    b.Property<int?>("QuotationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("quotation_id");
+
+                    b.Property<int>("ServiceOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("service_order_id");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("subtotal");
+
+                    b.Property<decimal>("Tax")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("tax");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuotationId")
+                        .IsUnique();
+
+                    b.HasIndex("ServiceOrderId")
+                        .IsUnique();
+
+                    b.ToTable("invoices", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Invoices.InvoiceDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.ToTable("invoice_details", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Invoices.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<DateTime>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<int>("PaymentMethodId")
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_method_id");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PaymentMethodId");
+
+                    b.ToTable("payments", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Invoices.PaymentMethod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("payment_methods", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.MeasurementUnit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Abbreviation")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("abbreviation");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Abbreviation")
+                        .IsUnique();
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("measurement_units", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.Part", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int>("MinStock")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_stock");
+
+                    b.Property<int>("PartCategoryId")
+                        .HasColumnType("integer")
+                        .HasColumnName("part_category_id");
+
+                    b.Property<int>("Stock")
+                        .HasColumnType("integer")
+                        .HasColumnName("stock");
+
+                    b.Property<int?>("UnitId")
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("PartCategoryId");
+
+                    b.HasIndex("UnitId");
+
+                    b.ToTable("parts", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.PartCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("part_categories", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.ServiceOrderPart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AppliedUnitPrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("applied_unit_price");
+
+                    b.Property<int>("PartId")
+                        .HasColumnType("integer")
+                        .HasColumnName("part_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<int>("ServiceOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("service_order_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartId");
+
+                    b.HasIndex("ServiceOrderId", "PartId")
+                        .IsUnique();
+
+                    b.ToTable("service_order_parts", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Entities.Persons.Person", b =>
                 {
                     b.Property<int>("Id")
@@ -170,7 +458,6 @@ namespace Infrastructure.Migrations
                         .HasColumnName("labor_cost");
 
                     b.Property<string>("Notes")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notes");
@@ -209,6 +496,40 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ServiceOrderId");
 
                     b.ToTable("quotations", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Quotations.QuotationDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PartId")
+                        .HasColumnType("integer")
+                        .HasColumnName("part_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<int>("QuotationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("quotation_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartId");
+
+                    b.HasIndex("QuotationId", "PartId")
+                        .IsUnique();
+
+                    b.ToTable("quotation_details", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Quotations.QuotationStatus", b =>
@@ -349,6 +670,194 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("service_types", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PartSupplier", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_primary");
+
+                    b.Property<int>("PartId")
+                        .HasColumnType("integer")
+                        .HasColumnName("part_id");
+
+                    b.Property<decimal>("PurchasePrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("purchase_price");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("integer")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("PartId", "SupplierId")
+                        .IsUnique();
+
+                    b.ToTable("part_suppliers", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime>("OrderedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ordered_at");
+
+                    b.Property<int>("PurchaseOrderStatusId")
+                        .HasColumnType("integer")
+                        .HasColumnName("purchase_order_status_id");
+
+                    b.Property<DateTime?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("integer")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseOrderStatusId");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("purchase_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrderDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PartId")
+                        .HasColumnType("integer")
+                        .HasColumnName("part_id");
+
+                    b.Property<int>("PurchaseOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartId");
+
+                    b.HasIndex("PurchaseOrderId", "PartId")
+                        .IsUnique();
+
+                    b.ToTable("purchase_order_details", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrderStatus", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("purchase_order_statuses", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.Supplier", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("company_name");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("contact_name");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("TaxId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("tax_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaxId")
+                        .IsUnique();
+
+                    b.ToTable("suppliers", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.User", b =>
@@ -607,6 +1116,91 @@ namespace Infrastructure.Migrations
                     b.Navigation("Person");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Invoices.Invoice", b =>
+                {
+                    b.HasOne("Domain.Entities.Quotations.Quotation", "Quotation")
+                        .WithOne("Invoice")
+                        .HasForeignKey("Domain.Entities.Invoices.Invoice", "QuotationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.ServiceOrders.ServiceOrder", "ServiceOrder")
+                        .WithOne("Invoice")
+                        .HasForeignKey("Domain.Entities.Invoices.Invoice", "ServiceOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Quotation");
+
+                    b.Navigation("ServiceOrder");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Invoices.InvoiceDetail", b =>
+                {
+                    b.HasOne("Domain.Entities.Invoices.Invoice", "Invoice")
+                        .WithMany("Details")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Invoices.Payment", b =>
+                {
+                    b.HasOne("Domain.Entities.Invoices.Invoice", "Invoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Invoices.PaymentMethod", "PaymentMethod")
+                        .WithMany("Payments")
+                        .HasForeignKey("PaymentMethodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("PaymentMethod");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.Part", b =>
+                {
+                    b.HasOne("Domain.Entities.Parts.PartCategory", "Category")
+                        .WithMany()
+                        .HasForeignKey("PartCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Parts.MeasurementUnit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.ServiceOrderPart", b =>
+                {
+                    b.HasOne("Domain.Entities.Parts.Part", "Part")
+                        .WithMany("OrderParts")
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.ServiceOrders.ServiceOrder", "ServiceOrder")
+                        .WithMany("Parts")
+                        .HasForeignKey("ServiceOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Part");
+
+                    b.Navigation("ServiceOrder");
+                });
+
             modelBuilder.Entity("Domain.Entities.Quotations.Quotation", b =>
                 {
                     b.HasOne("Domain.Entities.Users.User", "CreatedByUser")
@@ -632,6 +1226,25 @@ namespace Infrastructure.Migrations
                     b.Navigation("QuotationStatus");
 
                     b.Navigation("ServiceOrder");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Quotations.QuotationDetail", b =>
+                {
+                    b.HasOne("Domain.Entities.Parts.Part", "Part")
+                        .WithMany("QuotationDetails")
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Quotations.Quotation", "Quotation")
+                        .WithMany("Details")
+                        .HasForeignKey("QuotationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Part");
+
+                    b.Navigation("Quotation");
                 });
 
             modelBuilder.Entity("Domain.Entities.ServiceOrders.ServiceOrder", b =>
@@ -674,6 +1287,71 @@ namespace Infrastructure.Migrations
                     b.Navigation("ServiceType");
 
                     b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PartSupplier", b =>
+                {
+                    b.HasOne("Domain.Entities.Parts.Part", "Part")
+                        .WithMany("PartSuppliers")
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Suppliers.Supplier", "Supplier")
+                        .WithMany("PartSuppliers")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Part");
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrder", b =>
+                {
+                    b.HasOne("Domain.Entities.Suppliers.PurchaseOrderStatus", "Status")
+                        .WithMany("PurchaseOrders")
+                        .HasForeignKey("PurchaseOrderStatusId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Suppliers.Supplier", "Supplier")
+                        .WithMany("PurchaseOrders")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Status");
+
+                    b.Navigation("Supplier");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrderDetail", b =>
+                {
+                    b.HasOne("Domain.Entities.Parts.Part", "Part")
+                        .WithMany()
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Suppliers.PurchaseOrder", "PurchaseOrder")
+                        .WithMany("Details")
+                        .HasForeignKey("PurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Part");
+
+                    b.Navigation("PurchaseOrder");
                 });
 
             modelBuilder.Entity("Domain.Entities.Users.User", b =>
@@ -745,11 +1423,39 @@ namespace Infrastructure.Migrations
                     b.Navigation("Appointments");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Invoices.Invoice", b =>
+                {
+                    b.Navigation("Details");
+
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Invoices.PaymentMethod", b =>
+                {
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Parts.Part", b =>
+                {
+                    b.Navigation("OrderParts");
+
+                    b.Navigation("PartSuppliers");
+
+                    b.Navigation("QuotationDetails");
+                });
+
             modelBuilder.Entity("Domain.Entities.Persons.Person", b =>
                 {
                     b.Navigation("Customer");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Quotations.Quotation", b =>
+                {
+                    b.Navigation("Details");
+
+                    b.Navigation("Invoice");
                 });
 
             modelBuilder.Entity("Domain.Entities.Quotations.QuotationStatus", b =>
@@ -764,6 +1470,10 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.ServiceOrders.ServiceOrder", b =>
                 {
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Parts");
+
                     b.Navigation("Quotations");
                 });
 
@@ -772,6 +1482,23 @@ namespace Infrastructure.Migrations
                     b.Navigation("Appointments");
 
                     b.Navigation("ServiceOrders");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrder", b =>
+                {
+                    b.Navigation("Details");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.PurchaseOrderStatus", b =>
+                {
+                    b.Navigation("PurchaseOrders");
+                });
+
+            modelBuilder.Entity("Domain.Entities.Suppliers.Supplier", b =>
+                {
+                    b.Navigation("PartSuppliers");
+
+                    b.Navigation("PurchaseOrders");
                 });
 
             modelBuilder.Entity("Domain.Entities.Vehicles.FuelType", b =>

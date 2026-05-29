@@ -1,8 +1,12 @@
 using Domain.Entities.ServiceOrders;
 using Domain.Entities.Quotations;
+using Domain.Entities.Suppliers;
+using Domain.Entities.Invoices;
 using Domain.ValueObject.ServiceOrders.OrderStatus;
 using Domain.ValueObject.ServiceOrders.ServiceType;
 using Domain.ValueObject.Quotations.QuotationStatus;
+using Domain.ValueObject.Suppliers.PurchaseOrderStatus;
+using Domain.ValueObject.Invoices.PaymentMethod;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +28,8 @@ public sealed class DatabaseInitializer
         await SeedOrderStatusesAsync();
         await SeedServiceTypesAsync();
         await SeedQuotationStatusesAsync();
+        await SeedPurchaseOrderStatusesAsync();
+        await SeedPaymentMethodsAsync();
     }
 
     private async Task SeedOrderStatusesAsync()
@@ -78,6 +84,44 @@ public sealed class DatabaseInitializer
         };
 
         await _dbContext.QuotationStatuses.AddRangeAsync(quotationStatuses);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedPurchaseOrderStatusesAsync()
+    {
+        if (await _dbContext.PurchaseOrderStatuses.AnyAsync())
+        {
+            return;
+        }
+
+        var purchaseOrderStatuses = new[]
+        {
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Pending")),
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Sent")),
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Received")),
+            new PurchaseOrderStatus(new PurchaseOrderStatusName("Cancelled"))
+        };
+
+        await _dbContext.PurchaseOrderStatuses.AddRangeAsync(purchaseOrderStatuses);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedPaymentMethodsAsync()
+    {
+        if (await _dbContext.PaymentMethods.AnyAsync())
+        {
+            return;
+        }
+
+        var paymentMethods = new[]
+        {
+            new PaymentMethod(new PaymentMethodName("Cash")),
+            new PaymentMethod(new PaymentMethodName("Credit Card")),
+            new PaymentMethod(new PaymentMethodName("Debit Card")),
+            new PaymentMethod(new PaymentMethodName("Bank Transfer"))
+        };
+
+        await _dbContext.PaymentMethods.AddRangeAsync(paymentMethods);
         await _dbContext.SaveChangesAsync();
     }
 }
