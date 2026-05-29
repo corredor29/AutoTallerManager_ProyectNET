@@ -2,11 +2,13 @@ using Domain.Entities.ServiceOrders;
 using Domain.Entities.Quotations;
 using Domain.Entities.Suppliers;
 using Domain.Entities.Invoices;
+using Domain.Entities.Appointments;
 using Domain.ValueObject.ServiceOrders.OrderStatus;
 using Domain.ValueObject.ServiceOrders.ServiceType;
 using Domain.ValueObject.Quotations.QuotationStatus;
 using Domain.ValueObject.Suppliers.PurchaseOrderStatus;
 using Domain.ValueObject.Invoices.PaymentMethod;
+using Domain.ValueObject.Appointments.AppointmentStatus;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,11 +27,31 @@ public sealed class DatabaseInitializer
     {
         await _dbContext.Database.MigrateAsync();
 
+        await SeedAppointmentStatusesAsync();
         await SeedOrderStatusesAsync();
         await SeedServiceTypesAsync();
         await SeedQuotationStatusesAsync();
         await SeedPurchaseOrderStatusesAsync();
         await SeedPaymentMethodsAsync();
+    }
+
+    private async Task SeedAppointmentStatusesAsync()
+    {
+        if (await _dbContext.AppointmentStatuses.AnyAsync())
+        {
+            return;
+        }
+
+        var statuses = new[]
+        {
+            new AppointmentStatus(new AppointmentStatusName("Pending")),
+            new AppointmentStatus(new AppointmentStatusName("Confirmed")),
+            new AppointmentStatus(new AppointmentStatusName("Completed")),
+            new AppointmentStatus(new AppointmentStatusName("Cancelled"))
+        };
+
+        await _dbContext.AppointmentStatuses.AddRangeAsync(statuses);
+        await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedOrderStatusesAsync()
