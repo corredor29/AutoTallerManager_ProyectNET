@@ -16,6 +16,16 @@ using Domain.ValueObject.Users.Role;
 using Domain.ValueObject.Users.User;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
+using Domain.Entities.Vehicles;
+using Domain.Entities.Audit;
+using Domain.ValueObject.Vehicles.VehicleBrand;
+using Domain.ValueObject.Vehicles.VehicleColor;
+using Domain.ValueObject.Vehicles.FuelType;
+using Domain.ValueObject.Vehicles.TransmissionType;
+using Domain.ValueObject.Persons.DocumentType;
+using Domain.ValueObject.Persons.EmailDomain;
+using Domain.ValueObject.Persons.PhoneCode;
+using Domain.ValueObject.Audit.AuditActionType;
 
 namespace Infrastructure.Data;
 
@@ -40,6 +50,15 @@ public sealed class DatabaseInitializer
         await SeedPaymentMethodsAsync();
         await SeedRolesAsync();
         await SeedDefaultAdminAsync();
+        await SeedDocumentTypesAsync();
+        await SeedEmailDomainsAsync();
+        await SeedPhoneCodesAsync();
+        await SeedVehicleBrandsAsync();
+        await SeedVehicleColorsAsync();
+        await SeedFuelTypesAsync();
+        await SeedTransmissionTypesAsync();
+        await SeedAuditActionTypesAsync();
+
     }
 
     private async Task SeedAppointmentStatusesAsync()
@@ -193,6 +212,147 @@ public sealed class DatabaseInitializer
         await _dbContext.SaveChangesAsync();
 
         await _dbContext.UserRoles.AddAsync(new UserRole(user.Id, adminRole.Id));
+        await _dbContext.SaveChangesAsync();
+    }
+    private async Task SeedDocumentTypesAsync()
+    {
+        if (await _dbContext.DocumentTypes.AnyAsync()) return;
+
+        var documentTypes = new[]
+        {
+            new DocumentType(new DocumentCode("NID"),  new DocumentTypeName("National Identity Document")),
+            new DocumentType(new DocumentCode("TIN"),  new DocumentTypeName("Tax Identification Number")),
+            new DocumentType(new DocumentCode("FID"),  new DocumentTypeName("Foreign Identity Document")),
+            new DocumentType(new DocumentCode("PAS"),  new DocumentTypeName("Passport"))
+        };
+
+        await _dbContext.DocumentTypes.AddRangeAsync(documentTypes);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedEmailDomainsAsync()
+    {
+        if (await _dbContext.EmailDomains.AnyAsync()) return;
+
+        var domains = new[]
+        {
+            new EmailDomain(new EmailDomainValue("gmail.com")),
+            new EmailDomain(new EmailDomainValue("outlook.com")),
+            new EmailDomain(new EmailDomainValue("hotmail.com")),
+            new EmailDomain(new EmailDomainValue("yahoo.com")),
+            new EmailDomain(new EmailDomainValue("icloud.com"))
+        };
+
+        await _dbContext.EmailDomains.AddRangeAsync(domains);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedPhoneCodesAsync()
+    {
+        if (await _dbContext.PhoneCodes.AnyAsync()) return;
+
+        var phoneCodes = new[]
+        {
+            new PhoneCode(new PhoneCodeValue("+57"), new PhoneCodeCountry("Colombia")),
+            new PhoneCode(new PhoneCodeValue("+1"),  new PhoneCodeCountry("United States")),
+            new PhoneCode(new PhoneCodeValue("+52"), new PhoneCodeCountry("Mexico")),
+            new PhoneCode(new PhoneCodeValue("+34"), new PhoneCodeCountry("Spain")),
+            new PhoneCode(new PhoneCodeValue("+55"), new PhoneCodeCountry("Brazil"))
+        };
+
+        await _dbContext.PhoneCodes.AddRangeAsync(phoneCodes);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedVehicleBrandsAsync()
+    {
+        if (await _dbContext.VehicleBrands.AnyAsync()) return;
+
+        var brands = new[]
+        {
+            new VehicleBrand(new BrandName("Toyota")),
+            new VehicleBrand(new BrandName("Chevrolet")),
+            new VehicleBrand(new BrandName("Ford")),
+            new VehicleBrand(new BrandName("Mazda")),
+            new VehicleBrand(new BrandName("Renault")),
+            new VehicleBrand(new BrandName("Kia")),
+            new VehicleBrand(new BrandName("Hyundai")),
+            new VehicleBrand(new BrandName("Volkswagen")),
+            new VehicleBrand(new BrandName("Nissan")),
+            new VehicleBrand(new BrandName("Honda"))
+        };
+
+        await _dbContext.VehicleBrands.AddRangeAsync(brands);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedVehicleColorsAsync()
+    {
+        if (await _dbContext.VehicleColors.AnyAsync()) return;
+
+        var colors = new[]
+        {
+            new VehicleColor(new ColorName("White")),
+            new VehicleColor(new ColorName("Black")),
+            new VehicleColor(new ColorName("Silver")),
+            new VehicleColor(new ColorName("Gray")),
+            new VehicleColor(new ColorName("Red")),
+            new VehicleColor(new ColorName("Blue")),
+            new VehicleColor(new ColorName("Green")),
+            new VehicleColor(new ColorName("Yellow"))
+        };
+
+        await _dbContext.VehicleColors.AddRangeAsync(colors);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedFuelTypesAsync()
+    {
+        if (await _dbContext.FuelTypes.AnyAsync()) return;
+
+        var fuelTypes = new[]
+        {
+            new FuelType(new FuelTypeName("Gasoline")),
+            new FuelType(new FuelTypeName("Diesel")),
+            new FuelType(new FuelTypeName("Electric")),
+            new FuelType(new FuelTypeName("Hybrid")),
+            new FuelType(new FuelTypeName("Natural Gas"))
+        };
+
+        await _dbContext.FuelTypes.AddRangeAsync(fuelTypes);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedTransmissionTypesAsync()
+    {
+        if (await _dbContext.TransmissionTypes.AnyAsync()) return;
+
+        var transmissionTypes = new[]
+        {
+            new TransmissionType(new TransmissionTypeName("Manual")),
+            new TransmissionType(new TransmissionTypeName("Automatic")),
+            new TransmissionType(new TransmissionTypeName("Semi-Automatic")),
+            new TransmissionType(new TransmissionTypeName("CVT"))
+        };
+
+        await _dbContext.TransmissionTypes.AddRangeAsync(transmissionTypes);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedAuditActionTypesAsync()
+    {
+        if (await _dbContext.AuditActionTypes.AnyAsync()) return;
+
+        var actionTypes = new[]
+        {
+            new AuditActionType(new AuditActionTypeName("Create")),
+            new AuditActionType(new AuditActionTypeName("Update")),
+            new AuditActionType(new AuditActionTypeName("Delete")),
+            new AuditActionType(new AuditActionTypeName("Login")),
+            new AuditActionType(new AuditActionTypeName("Logout"))
+        };
+
+        await _dbContext.AuditActionTypes.AddRangeAsync(actionTypes);
         await _dbContext.SaveChangesAsync();
     }
 }
