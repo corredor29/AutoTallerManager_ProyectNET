@@ -3,12 +3,14 @@ using Application.Requests.ServiceOrders;
 using Api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = AppRoles.Staff)]
+[EnableRateLimiting("service-orders")]
 public sealed class ServiceOrdersController : ControllerBase
 {
     private readonly IServiceOrderService _serviceOrderService;

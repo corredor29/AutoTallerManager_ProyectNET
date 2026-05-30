@@ -16,6 +16,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddHttpContextAccessor();
         services.AddDbContext<AutoTallerDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
         services.AddScoped<DatabaseInitializer>();

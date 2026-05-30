@@ -13,6 +13,7 @@ namespace Infrastructure.Services;
 public sealed class ServiceOrderService : IServiceOrderService
 {
     private static readonly string[] ClosingStatuses = ["completed", "cancelled", "canceled"];
+    private static readonly string[] CancelledStatuses = ["cancelled", "canceled"];
 
     private readonly IServiceOrderRepository _serviceOrderRepository;
     private readonly AutoTallerDbContext _dbContext;
@@ -138,6 +139,8 @@ public sealed class ServiceOrderService : IServiceOrderService
             return false;
         }
 
+        EnsureOrderIsOpen(order);
+
         order.Update(
             new WorkDescription(request.WorkPerformed),
             new ServiceOrderNotes(request.Notes),
@@ -156,9 +159,16 @@ public sealed class ServiceOrderService : IServiceOrderService
             return false;
         }
 
+        EnsureOrderIsOpen(order);
+
         if (!await _dbContext.OrderStatuses.AnyAsync(x => x.Id == request.OrderStatusId))
         {
             throw new ArgumentException($"Order status {request.OrderStatusId} does not exist.");
+        }
+
+        if (await ShouldReleaseReservedPartsAsync(request.OrderStatusId))
+        {
+            await ReleaseReservedPartsAsync(order.Id);
         }
 
         order.ChangeStatus(request.OrderStatusId);
@@ -180,6 +190,8 @@ public sealed class ServiceOrderService : IServiceOrderService
         {
             return false;
         }
+
+        await ReleaseReservedPartsAsync(order.Id);
 
         _serviceOrderRepository.Remove(order);
         await _dbContext.SaveChangesAsync();
@@ -228,6 +240,44 @@ public sealed class ServiceOrderService : IServiceOrderService
             .FirstOrDefaultAsync();
 
         return statusName is not null && ClosingStatuses.Contains(statusName);
+    }
+
+    private async Task<bool> ShouldReleaseReservedPartsAsync(int orderStatusId)
+    {
+        var statusName = await _dbContext.OrderStatuses
+            .Where(x => x.Id == orderStatusId)
+            .Select(x => x.Name.Value.ToLower())
+            .FirstOrDefaultAsync();
+
+        return statusName is not null && CancelledStatuses.Contains(statusName);
+    }
+
+    private async Task ReleaseReservedPartsAsync(int serviceOrderId)
+    {
+        var reservedParts = await _dbContext.ServiceOrderParts
+            .Include(x => x.Part)
+            .Where(x => x.ServiceOrderId == serviceOrderId)
+            .ToListAsync();
+
+        if (reservedParts.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var reservedPart in reservedParts)
+        {
+            reservedPart.Part.AddStock(new Domain.ValueObject.Parts.Part.PartStock(reservedPart.Quantity.Value));
+        }
+
+        _dbContext.ServiceOrderParts.RemoveRange(reservedParts);
+    }
+
+    private static void EnsureOrderIsOpen(ServiceOrder order)
+    {
+        if (order.ClosedAt is not null)
+        {
+            throw new InvalidOperationException($"Service order {order.Id} is already closed.");
+        }
     }
 
     private static ServiceOrderDto MapToDto(ServiceOrder order)

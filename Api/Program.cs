@@ -1,16 +1,20 @@
 using Application.Mapping;
 using Api.Filters;
 using Api.Middleware;
+using Api.RateLimiting;
 using Api.Responses;
 using Infrastructure;
 using Infrastructure.Data;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Infrastructure.Services;
 using System.Text;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,9 +74,12 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<RouteRateLimitOptions>(builder.Configuration.GetSection(RouteRateLimitOptions.SectionName));
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
+var rateLimitOptions = builder.Configuration.GetSection(RouteRateLimitOptions.SectionName).Get<RouteRateLimitOptions>()
+    ?? new RouteRateLimitOptions();
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Key))
     throw new InvalidOperationException("JWT signing key is missing.");
@@ -94,6 +101,51 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.ContentType = "application/json";
+
+        var response = new ApiErrorResponse
+        {
+            Success = false,
+            StatusCode = StatusCodes.Status429TooManyRequests,
+            Title = "Too many requests",
+            Detail = "The rate limit for this endpoint has been exceeded. Please try again later.",
+            TraceId = context.HttpContext.TraceIdentifier
+        };
+
+        await context.HttpContext.Response.WriteAsync(
+            JsonSerializer.Serialize(response),
+            cancellationToken);
+    };
+
+    options.AddPolicy("service-orders", _ =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "service-orders",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.ServiceOrders.PermitLimit,
+                Window = TimeSpan.FromMinutes(rateLimitOptions.ServiceOrders.WindowMinutes),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = rateLimitOptions.ServiceOrders.QueueLimit,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("parts", _ =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "parts",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.Parts.PermitLimit,
+                Window = TimeSpan.FromMinutes(rateLimitOptions.Parts.WindowMinutes),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = rateLimitOptions.Parts.QueueLimit,
+                AutoReplenishment = true
+            }));
+});
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -113,6 +165,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

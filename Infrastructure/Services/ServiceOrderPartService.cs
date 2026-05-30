@@ -69,6 +69,8 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
             return false;
         }
 
+        await EnsureServiceOrderIsOpenAsync(item.ServiceOrderId);
+
         var part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Id == item.PartId)
             ?? throw new InvalidOperationException($"Part {item.PartId} could not be loaded.");
 
@@ -107,6 +109,8 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
             return false;
         }
 
+        await EnsureServiceOrderIsOpenAsync(item.ServiceOrderId);
+
         var part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Id == item.PartId)
             ?? throw new InvalidOperationException($"Part {item.PartId} could not be loaded.");
 
@@ -118,9 +122,15 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
 
     private async Task<Part> EnsureRelatedEntitiesExistAsync(int serviceOrderId, int partId)
     {
-        if (!await _dbContext.ServiceOrders.AnyAsync(x => x.Id == serviceOrderId))
+        var serviceOrder = await _dbContext.ServiceOrders.FirstOrDefaultAsync(x => x.Id == serviceOrderId);
+        if (serviceOrder is null)
         {
             throw new ArgumentException($"Service order {serviceOrderId} does not exist.");
+        }
+
+        if (serviceOrder.ClosedAt is not null)
+        {
+            throw new InvalidOperationException($"Service order {serviceOrderId} is already closed.");
         }
 
         var part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Id == partId && x.IsActive);
@@ -142,6 +152,19 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
         {
             throw new InvalidOperationException(
                 $"Part {partId} is already assigned to service order {serviceOrderId}.");
+        }
+    }
+
+    private async Task EnsureServiceOrderIsOpenAsync(int serviceOrderId)
+    {
+        var isClosed = await _dbContext.ServiceOrders
+            .Where(x => x.Id == serviceOrderId)
+            .Select(x => x.ClosedAt != null)
+            .FirstOrDefaultAsync();
+
+        if (isClosed)
+        {
+            throw new InvalidOperationException($"Service order {serviceOrderId} is already closed.");
         }
     }
 
