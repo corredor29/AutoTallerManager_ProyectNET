@@ -1,3 +1,4 @@
+using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Vehicles;
@@ -20,10 +21,69 @@ namespace Infrastructure.Services
             _dbContext = dbContext;
         }
 
-        public async Task<IEnumerable<VehicleDto>> GetAllAsync()
+        public async Task<PagedResult<VehicleDto>> GetAllAsync(GetVehiclesRequest request)
         {
-            var vehicles = await _vehicleRepository.GetAllAsync();
-            return vehicles.Select(v => MapToDto(v));
+            var query = _dbContext.Vehicles
+                .Include(v => v.Model)
+                    .ThenInclude(m => m.Brand)
+                .Include(v => v.Color)
+                .Include(v => v.FuelType)
+                .Include(v => v.TransmissionType)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var pattern = $"%{request.Search.Trim()}%";
+                query = query.Where(v =>
+                    EF.Functions.ILike(v.VIN.Value, pattern) ||
+                    (v.LicensePlate != null && EF.Functions.ILike(v.LicensePlate.Value, pattern)) ||
+                    EF.Functions.ILike(v.Model.ModelName.Value, pattern) ||
+                    EF.Functions.ILike(v.Model.Brand.BrandName.Value, pattern));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Vin))
+            {
+                var pattern = $"%{request.Vin.Trim()}%";
+                query = query.Where(v => EF.Functions.ILike(v.VIN.Value, pattern));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Brand))
+            {
+                var pattern = $"%{request.Brand.Trim()}%";
+                query = query.Where(v => EF.Functions.ILike(v.Model.Brand.BrandName.Value, pattern));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Model))
+            {
+                var pattern = $"%{request.Model.Trim()}%";
+                query = query.Where(v => EF.Functions.ILike(v.Model.ModelName.Value, pattern));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.LicensePlate))
+            {
+                var pattern = $"%{request.LicensePlate.Trim()}%";
+                query = query.Where(v => v.LicensePlate != null && EF.Functions.ILike(v.LicensePlate.Value, pattern));
+            }
+
+            var totalCount = await query.CountAsync();
+            var pageNumber = request.NormalizedPageNumber;
+            var pageSize = request.NormalizedPageSize;
+
+            var vehicles = await query
+                .OrderBy(v => v.Model.Brand.BrandName.Value)
+                .ThenBy(v => v.Model.ModelName.Value)
+                .ThenBy(v => v.VIN.Value)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<VehicleDto>
+            {
+                Items = vehicles.Select(MapToDto).ToArray(),
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
         }
 
         public async Task<VehicleDto?> GetByIdAsync(int id)

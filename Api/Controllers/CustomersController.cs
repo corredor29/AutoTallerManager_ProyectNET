@@ -1,5 +1,4 @@
 using Application.Contracts.Services;
-using Application.DTOs.Customers;
 using Application.Requests.Customers;
 using Api.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -20,9 +19,10 @@ namespace Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetCustomersRequest request)
         {
-            var customers = await _customerService.GetAllAsync();
+            var customers = await _customerService.GetAllAsync(request);
+            Response.Headers.Append("X-Total-Count", customers.TotalCount.ToString());
             return Ok(customers);
         }
 

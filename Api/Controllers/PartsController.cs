@@ -19,9 +19,10 @@ public sealed class PartsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] GetPartsRequest request)
     {
-        var parts = await _partService.GetAllAsync();
+        var parts = await _partService.GetAllAsync(request);
+        Response.Headers.Append("X-Total-Count", parts.TotalCount.ToString());
         return Ok(parts);
     }
 

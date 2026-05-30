@@ -19,9 +19,10 @@ public sealed class ServiceOrdersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] GetServiceOrdersRequest request)
     {
-        var orders = await _serviceOrderService.GetAllAsync();
+        var orders = await _serviceOrderService.GetAllAsync(request);
+        Response.Headers.Append("X-Total-Count", orders.TotalCount.ToString());
         return Ok(orders);
     }
 

@@ -1,5 +1,4 @@
 using Application.Contracts.Services;
-using Application.DTOs.Vehicles;
 using Application.Requests.Vehicles;
 using Api.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -20,9 +19,10 @@ namespace Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetVehiclesRequest request)
         {
-            var vehicles = await _vehicleService.GetAllAsync();
+            var vehicles = await _vehicleService.GetAllAsync(request);
+            Response.Headers.Append("X-Total-Count", vehicles.TotalCount.ToString());
             return Ok(vehicles);
         }
 

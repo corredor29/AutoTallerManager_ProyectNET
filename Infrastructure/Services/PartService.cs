@@ -1,3 +1,4 @@
+using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Parts;
@@ -20,10 +21,53 @@ public sealed class PartService : IPartService
         _dbContext = dbContext;
     }
 
-    public async Task<IEnumerable<PartDto>> GetAllAsync()
+    public async Task<PagedResult<PartDto>> GetAllAsync(GetPartsRequest request)
     {
-        var parts = await _partRepository.GetAllAsync();
-        return parts.Select(MapToDto);
+        var query = _dbContext.Parts
+            .Include(x => x.Category)
+            .Include(x => x.Unit)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var pattern = $"%{request.Search.Trim()}%";
+            query = query.Where(x =>
+                EF.Functions.ILike(x.Code.Value, pattern) ||
+                EF.Functions.ILike(x.Description.Value, pattern));
+        }
+
+        if (request.PartCategoryId.HasValue)
+        {
+            query = query.Where(x => x.PartCategoryId == request.PartCategoryId.Value);
+        }
+
+        if (request.IsActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == request.IsActive.Value);
+        }
+
+        if (request.LowStockOnly == true)
+        {
+            query = query.Where(x => x.Stock.Value <= x.MinStock.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+        var pageNumber = request.NormalizedPageNumber;
+        var pageSize = request.NormalizedPageSize;
+
+        var parts = await query
+            .OrderBy(x => x.Code.Value)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<PartDto>
+        {
+            Items = parts.Select(MapToDto).ToArray(),
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 
     public async Task<PartDto?> GetByIdAsync(int id)

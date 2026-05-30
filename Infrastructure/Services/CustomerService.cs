@@ -1,13 +1,14 @@
+using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Customers;
 using Application.Requests.Customers;
-using Application.Mapping;
 using Domain.Entities.Customers;
 using Domain.Entities.Persons;
 using Domain.ValueObject.Persons.Person;
 using Infrastructure.Context;
 using Mapster;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services
 {
@@ -22,10 +23,43 @@ namespace Infrastructure.Services
             _dbContext = dbContext;
         }
 
-        public async Task<IEnumerable<CustomerDto>> GetAllAsync()
+        public async Task<PagedResult<CustomerDto>> GetAllAsync(GetCustomersRequest request)
         {
-            var customers = await _customerRepository.GetAllAsync();
-            return customers.Select(x => x.Adapt<CustomerDto>());
+            var query = _dbContext.Customers
+                .Include(x => x.Person)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var pattern = $"%{request.Search.Trim()}%";
+                query = query.Where(x =>
+                    EF.Functions.ILike(x.Person.FirstName.Value, pattern) ||
+                    EF.Functions.ILike(x.Person.LastName.Value, pattern));
+            }
+
+            if (request.IsActive.HasValue)
+            {
+                query = query.Where(x => x.Status.IsActive == request.IsActive.Value);
+            }
+
+            var totalCount = await query.CountAsync();
+            var pageNumber = request.NormalizedPageNumber;
+            var pageSize = request.NormalizedPageSize;
+
+            var customers = await query
+                .OrderBy(x => x.Person.FirstName.Value)
+                .ThenBy(x => x.Person.LastName.Value)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<CustomerDto>
+            {
+                Items = customers.Select(x => x.Adapt<CustomerDto>()).ToArray(),
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
         }
 
         public async Task<CustomerDto?> GetByIdAsync(int id)
