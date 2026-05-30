@@ -12,6 +12,8 @@ namespace Infrastructure.Services;
 
 public sealed class InvoiceService : IInvoiceService
 {
+    private static readonly string[] BillableStatuses = ["completed", "cancelled", "canceled"];
+
     private readonly IInvoiceRepository _invoiceRepository;
     private readonly AutoTallerDbContext _dbContext;
 
@@ -87,7 +89,14 @@ public sealed class InvoiceService : IInvoiceService
         await EnsureUniqueServiceOrderInvoiceAsync(request.ServiceOrderId);
         await EnsureQuotationAvailabilityAsync(request.QuotationId);
 
-        var subtotal = request.LaborCost;
+        var serviceOrderParts = await _dbContext.ServiceOrderParts
+            .Include(x => x.Part)
+            .Where(x => x.ServiceOrderId == request.ServiceOrderId)
+            .OrderBy(x => x.Id)
+            .ToListAsync();
+
+        var partsTotal = serviceOrderParts.Sum(x => x.Quantity.Value * x.AppliedUnitPrice.Value);
+        var subtotal = request.LaborCost + partsTotal;
         var total = subtotal + request.Tax;
 
         var invoice = new Invoice(
@@ -102,7 +111,24 @@ public sealed class InvoiceService : IInvoiceService
         await _invoiceRepository.AddAsync(invoice);
         await _dbContext.SaveChangesAsync();
 
-        return MapToDto(invoice);
+        if (serviceOrderParts.Count > 0)
+        {
+            var details = serviceOrderParts.Select(serviceOrderPart =>
+                new InvoiceDetail(
+                    invoice.Id,
+                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailDescription(serviceOrderPart.Part.Description.Value),
+                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailQuantity(serviceOrderPart.Quantity.Value),
+                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailUnitPrice(serviceOrderPart.AppliedUnitPrice.Value)))
+                .ToArray();
+
+            await _dbContext.InvoiceDetails.AddRangeAsync(details);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        var createdInvoice = await _invoiceRepository.GetByIdAsync(invoice.Id)
+            ?? throw new InvalidOperationException("Invoice could not be reloaded after creation.");
+
+        return MapToDto(createdInvoice);
     }
 
     public async Task<bool> UpdateAsync(int id, UpdateInvoiceRequest request)
@@ -152,14 +178,37 @@ public sealed class InvoiceService : IInvoiceService
 
     private async Task EnsureRelatedEntitiesExistAsync(int serviceOrderId, int? quotationId)
     {
-        if (!await _dbContext.ServiceOrders.AnyAsync(x => x.Id == serviceOrderId))
+        var serviceOrderStatusName = await _dbContext.ServiceOrders
+            .Where(x => x.Id == serviceOrderId)
+            .Select(x => x.OrderStatus.Name.Value.ToLower())
+            .FirstOrDefaultAsync();
+
+        if (serviceOrderStatusName is null)
         {
             throw new ArgumentException($"Service order {serviceOrderId} does not exist.");
+        }
+
+        if (!BillableStatuses.Contains(serviceOrderStatusName))
+        {
+            throw new InvalidOperationException($"Service order {serviceOrderId} is not ready to be invoiced.");
         }
 
         if (quotationId.HasValue && !await _dbContext.Quotations.AnyAsync(x => x.Id == quotationId.Value))
         {
             throw new ArgumentException($"Quotation {quotationId.Value} does not exist.");
+        }
+
+        if (quotationId.HasValue)
+        {
+            var quotationBelongsToOrder = await _dbContext.Quotations.AnyAsync(x =>
+                x.Id == quotationId.Value &&
+                x.ServiceOrderId == serviceOrderId);
+
+            if (!quotationBelongsToOrder)
+            {
+                throw new InvalidOperationException(
+                    $"Quotation {quotationId.Value} does not belong to service order {serviceOrderId}.");
+            }
         }
     }
 
