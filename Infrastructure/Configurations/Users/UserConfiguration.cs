@@ -1,39 +1,44 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastructure.Configurations.Users;
-
-public sealed class UserConfiguration : IEntityTypeConfiguration<User>
+namespace Infrastructure.Configurations.Users
 {
-    public void Configure(EntityTypeBuilder<User> builder)
+    public sealed class UserConfiguration : IEntityTypeConfiguration<User>
     {
-        builder.ToTable("users");
+        public void Configure(EntityTypeBuilder<User> builder)
+        {
+            builder.ToTable("Users");
 
-        builder.HasKey(x => x.Id);
+            builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.PersonId)
-            .HasColumnName("person_id")
-            .IsRequired();
+            builder.Property(x => x.PersonId)
+                .IsRequired();
 
-        builder.Property(x => x.PasswordHash)
-            .HasConversion(x => x.Value, value => new(value))
-            .HasMaxLength(255)
-            .HasColumnName("password_hash")
-            .IsRequired();
+            builder.Property(x => x.PasswordHash)
+                .HasConversion(v => v.Value, v => new(v))
+                .HasMaxLength(255)
+                .IsRequired();
 
-        builder.Property(x => x.IsActive)
-            .HasColumnName("is_active")
-            .IsRequired();
+            builder.Property(x => x.IsActive)
+                .IsRequired()
+                .HasDefaultValue(true);
 
-        builder.HasIndex(x => x.PersonId)
-            .IsUnique();
+            builder.HasIndex(x => x.PersonId).IsUnique();
 
-        builder.HasOne(x => x.Person)
-            .WithOne(x => x.User)
-            .HasForeignKey<User>(x => x.PersonId)
-            .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne(x => x.Person)
+                .WithOne(x => x.User)
+                .HasForeignKey<User>(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Ignore(x => x.UserRoles);
+            builder.HasMany(x => x.UserRoles)
+                .WithOne(x => x.User)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
     }
 }

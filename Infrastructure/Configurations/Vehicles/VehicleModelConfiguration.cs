@@ -2,32 +2,37 @@ using Domain.Entities.Vehicles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastructure.Configurations.Vehicles;
-
-public sealed class VehicleModelConfiguration : IEntityTypeConfiguration<VehicleModel>
+namespace Infrastructure.Configurations.Vehicles
 {
-    public void Configure(EntityTypeBuilder<VehicleModel> builder)
+
+    public sealed class VehicleModelConfiguration : IEntityTypeConfiguration<VehicleModel>
     {
-        builder.ToTable("vehicle_models");
+        public void Configure(EntityTypeBuilder<VehicleModel> builder)
+        {
+            builder.ToTable("VehicleModels");
 
-        builder.HasKey(x => x.Id);
+            builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.BrandId)
-            .HasColumnName("brand_id")
-            .IsRequired();
+            builder.Property(x => x.BrandId)
+                .IsRequired();
 
-        builder.Property(x => x.ModelName)
-            .HasConversion(x => x.Value, value => new(value))
-            .HasMaxLength(100)
-            .HasColumnName("model_name")
-            .IsRequired();
+            builder.Property(x => x.ModelName)
+                .HasConversion(v => v.Value, v => new(v))
+                .HasMaxLength(80)
+                .IsRequired();
 
-        builder.HasIndex(x => new { x.BrandId, x.ModelName })
-            .IsUnique();
+            builder.HasIndex(x => new { x.BrandId, x.ModelName })
+                .IsUnique();
 
-        builder.HasOne(x => x.Brand)
-            .WithMany(x => x.Models)
-            .HasForeignKey(x => x.BrandId)
-            .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne(x => x.Brand)
+                .WithMany(x => x.Models)
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasMany(x => x.Vehicles)
+                .WithOne(x => x.Model)
+                .HasForeignKey(x => x.ModelId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
     }
 }
