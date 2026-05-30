@@ -1,11 +1,14 @@
 using Application.Contracts.Services;
 using Application.Requests.Appointments;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.Staff)]
 public sealed class AppointmentsController : ControllerBase
 {
     private readonly IAppointmentService _appointmentService;
@@ -35,6 +38,7 @@ public sealed class AppointmentsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrReceptionist)]
     public async Task<IActionResult> Create([FromBody] CreateAppointmentRequest request)
     {
         var appointment = await _appointmentService.CreateAsync(request);
@@ -42,6 +46,7 @@ public sealed class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.AdminOrReceptionist)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateAppointmentRequest request)
     {
         var updated = await _appointmentService.UpdateAsync(id, request);
@@ -54,6 +59,7 @@ public sealed class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:int}/status")]
+    [Authorize(Roles = AppRoles.AdminOrReceptionist)]
     public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeAppointmentStatusRequest request)
     {
         var updated = await _appointmentService.ChangeStatusAsync(id, request);
@@ -66,6 +72,7 @@ public sealed class AppointmentsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var removed = await _appointmentService.DeleteAsync(id);

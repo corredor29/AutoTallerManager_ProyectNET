@@ -3,12 +3,17 @@ using Domain.Entities.Quotations;
 using Domain.Entities.Suppliers;
 using Domain.Entities.Invoices;
 using Domain.Entities.Appointments;
+using Domain.Entities.Users;
+using Domain.Entities.Persons;
 using Domain.ValueObject.ServiceOrders.OrderStatus;
 using Domain.ValueObject.ServiceOrders.ServiceType;
 using Domain.ValueObject.Quotations.QuotationStatus;
 using Domain.ValueObject.Suppliers.PurchaseOrderStatus;
 using Domain.ValueObject.Invoices.PaymentMethod;
 using Domain.ValueObject.Appointments.AppointmentStatus;
+using Domain.ValueObject.Persons.Person;
+using Domain.ValueObject.Users.Role;
+using Domain.ValueObject.Users.User;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,6 +38,8 @@ public sealed class DatabaseInitializer
         await SeedQuotationStatusesAsync();
         await SeedPurchaseOrderStatusesAsync();
         await SeedPaymentMethodsAsync();
+        await SeedRolesAsync();
+        await SeedDefaultAdminAsync();
     }
 
     private async Task SeedAppointmentStatusesAsync()
@@ -144,6 +151,48 @@ public sealed class DatabaseInitializer
         };
 
         await _dbContext.PaymentMethods.AddRangeAsync(paymentMethods);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedRolesAsync()
+    {
+        if (await _dbContext.Roles.AnyAsync())
+        {
+            return;
+        }
+
+        var roles = new[]
+        {
+            new Role(new RoleName("Admin")),
+            new Role(new RoleName("Mechanic")),
+            new Role(new RoleName("Receptionist"))
+        };
+
+        await _dbContext.Roles.AddRangeAsync(roles);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedDefaultAdminAsync()
+    {
+        if (await _dbContext.Users.AnyAsync())
+        {
+            return;
+        }
+
+        var adminRole = (await _dbContext.Roles.ToListAsync())
+            .FirstOrDefault(x => x.RoleName.Value == "Admin")
+            ?? throw new InvalidOperationException("Admin role must exist before seeding the default admin user.");
+
+        var person = new Person(new PersonFirstName("System"), new PersonLastName("Administrator"));
+        await _dbContext.Persons.AddAsync(person);
+        await _dbContext.SaveChangesAsync();
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!");
+        var user = new User(person.Id, new PasswordHash(passwordHash));
+        await _dbContext.Users.AddAsync(user);
+        await _dbContext.SaveChangesAsync();
+
+        await _dbContext.UserRoles.AddAsync(new UserRole(user.Id, adminRole.Id));
         await _dbContext.SaveChangesAsync();
     }
 }

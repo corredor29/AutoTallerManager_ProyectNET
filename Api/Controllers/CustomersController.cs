@@ -1,12 +1,15 @@
 using Application.Contracts.Services;
 using Application.DTOs.Customers;
 using Application.Requests.Customers;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = AppRoles.Staff)]
     public class CustomersController : ControllerBase
     {
         private readonly ICustomerService _customerService;
@@ -36,6 +39,7 @@ namespace Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request)
         {
             var customer = await _customerService.CreateAsync(request);
@@ -43,6 +47,7 @@ namespace Api.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerRequest request)
         {
             var updated = await _customerService.UpdateAsync(id, request);
@@ -55,6 +60,7 @@ namespace Api.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)
         {
             var removed = await _customerService.DeleteAsync(id);
