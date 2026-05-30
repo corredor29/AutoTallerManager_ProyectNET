@@ -1,11 +1,14 @@
 using Application.Contracts.Services;
 using Application.Requests.Parts;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.Staff)]
 public sealed class PartsController : ControllerBase
 {
     private readonly IPartService _partService;
@@ -35,6 +38,7 @@ public sealed class PartsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Create([FromBody] CreatePartRequest request)
     {
         var part = await _partService.CreateAsync(request);
@@ -42,6 +46,7 @@ public sealed class PartsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePartRequest request)
     {
         var updated = await _partService.UpdateAsync(id, request);
@@ -54,6 +59,7 @@ public sealed class PartsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var removed = await _partService.DeleteAsync(id);

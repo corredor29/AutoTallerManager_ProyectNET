@@ -1,12 +1,15 @@
 using Application.Contracts.Services;
 using Application.DTOs.Vehicles;
 using Application.Requests.Vehicles;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = AppRoles.Staff)]
     public class VehiclesController : ControllerBase
     {
         private readonly IVehicleService _vehicleService;
@@ -36,6 +39,7 @@ namespace Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Create([FromBody] CreateVehicleRequest request)
         {
             var vehicle = await _vehicleService.CreateAsync(request);
@@ -43,6 +47,7 @@ namespace Api.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateVehicleRequest request)
         {
             var updated = await _vehicleService.UpdateAsync(id, request);
@@ -55,6 +60,7 @@ namespace Api.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)
         {
             var removed = await _vehicleService.DeleteAsync(id);

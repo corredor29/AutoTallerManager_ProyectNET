@@ -1,11 +1,14 @@
 using Application.Contracts.Services;
 using Application.Requests.Invoices;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.AdminOrMechanic)]
 public sealed class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
@@ -54,6 +57,7 @@ public sealed class InvoicesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var removed = await _invoiceService.DeleteAsync(id);
