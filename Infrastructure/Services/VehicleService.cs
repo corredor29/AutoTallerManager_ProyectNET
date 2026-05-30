@@ -154,9 +154,28 @@ namespace Infrastructure.Services
                 return false;
             }
 
+            await EnsureVehicleCanBeDeletedAsync(id);
+
             _vehicleRepository.Remove(vehicle);
             await _dbContext.SaveChangesAsync();
             return true;
+        }
+
+        private async Task EnsureVehicleCanBeDeletedAsync(int vehicleId)
+        {
+            var hasServiceOrders = await _dbContext.ServiceOrders.AnyAsync(x => x.VehicleId == vehicleId);
+            if (hasServiceOrders)
+            {
+                throw new InvalidOperationException(
+                    $"Vehicle {vehicleId} cannot be deleted because it has service orders associated.");
+            }
+
+            var hasAppointments = await _dbContext.Appointments.AnyAsync(x => x.VehicleId == vehicleId);
+            if (hasAppointments)
+            {
+                throw new InvalidOperationException(
+                    $"Vehicle {vehicleId} cannot be deleted because it has appointments associated.");
+            }
         }
 
         private static VehicleDto MapToDto(Vehicle vehicle)

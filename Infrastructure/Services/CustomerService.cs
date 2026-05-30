@@ -113,9 +113,31 @@ namespace Infrastructure.Services
                 return false;
             }
 
+            await EnsureCustomerCanBeDeletedAsync(id);
+
             _customerRepository.Remove(customer);
             await _dbContext.SaveChangesAsync();
             return true;
+        }
+
+        private async Task EnsureCustomerCanBeDeletedAsync(int customerId)
+        {
+            var hasAppointments = await _dbContext.Appointments.AnyAsync(x => x.CustomerId == customerId);
+            if (hasAppointments)
+            {
+                throw new InvalidOperationException(
+                    $"Customer {customerId} cannot be deleted because it has appointments associated.");
+            }
+
+            var hasServiceOrders = await _dbContext.ServiceOrders.AnyAsync(x =>
+                x.AppointmentId.HasValue &&
+                _dbContext.Appointments.Any(a => a.Id == x.AppointmentId.Value && a.CustomerId == customerId));
+
+            if (hasServiceOrders)
+            {
+                throw new InvalidOperationException(
+                    $"Customer {customerId} cannot be deleted because it has service orders associated.");
+            }
         }
     }
 }
