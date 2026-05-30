@@ -1,3 +1,4 @@
+using Api.Responses;
 using System.Net;
 using System.Text.Json;
 
@@ -37,11 +38,13 @@ public sealed class ApiExceptionMiddleware
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
 
-        var payload = JsonSerializer.Serialize(new
+        var payload = JsonSerializer.Serialize(new ApiErrorResponse
         {
-            title,
-            detail = exception.Message,
-            status = (int)statusCode
+            Success = false,
+            Title = title,
+            Detail = exception.Message,
+            StatusCode = (int)statusCode,
+            TraceId = context.TraceIdentifier
         });
 
         return context.Response.WriteAsync(payload);

@@ -1,8 +1,11 @@
 using Application.Mapping;
+using Api.Filters;
 using Api.Middleware;
+using Api.Responses;
 using Infrastructure;
 using Infrastructure.Data;
 using Mapster;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -12,7 +15,36 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 MapsterConfig.Register(TypeAdapterConfig.GlobalSettings);
-builder.Services.AddControllers();
+builder.Services.AddScoped<ApiResponseFilter>();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ApiResponseFilter>();
+});
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(x => x.Value?.Errors.Count > 0)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Value!.Errors.Select(error =>
+                        string.IsNullOrWhiteSpace(error.ErrorMessage) ? "The input is invalid." : error.ErrorMessage)
+                    .ToArray());
+
+        var response = new ApiErrorResponse
+        {
+            Success = false,
+            StatusCode = StatusCodes.Status400BadRequest,
+            Title = "Validation failed",
+            Detail = "One or more validation errors occurred.",
+            TraceId = context.HttpContext.TraceIdentifier,
+            Errors = errors
+        };
+
+        return new BadRequestObjectResult(response);
+    };
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
