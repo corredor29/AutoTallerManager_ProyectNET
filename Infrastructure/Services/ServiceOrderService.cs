@@ -1,3 +1,4 @@
+using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.ServiceOrders;
@@ -22,10 +23,67 @@ public sealed class ServiceOrderService : IServiceOrderService
         _dbContext = dbContext;
     }
 
-    public async Task<IEnumerable<ServiceOrderDto>> GetAllAsync()
+    public async Task<PagedResult<ServiceOrderDto>> GetAllAsync(GetServiceOrdersRequest request)
     {
-        var orders = await _serviceOrderRepository.GetAllAsync();
-        return orders.Select(MapToDto);
+        var query = _dbContext.ServiceOrders
+            .Include(x => x.Vehicle)
+                .ThenInclude(x => x.Model)
+                    .ThenInclude(x => x.Brand)
+            .Include(x => x.ServiceType)
+            .Include(x => x.OrderStatus)
+            .Include(x => x.Mechanic)
+                .ThenInclude(x => x.Person)
+            .AsQueryable();
+
+        if (request.VehicleId.HasValue)
+        {
+            query = query.Where(x => x.VehicleId == request.VehicleId.Value);
+        }
+
+        if (request.MechanicId.HasValue)
+        {
+            query = query.Where(x => x.MechanicId == request.MechanicId.Value);
+        }
+
+        if (request.OrderStatusId.HasValue)
+        {
+            query = query.Where(x => x.OrderStatusId == request.OrderStatusId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Vin))
+        {
+            var pattern = $"%{request.Vin.Trim()}%";
+            query = query.Where(x => EF.Functions.ILike(x.Vehicle.VIN.Value, pattern));
+        }
+
+        if (request.CreatedFrom.HasValue)
+        {
+            query = query.Where(x => x.CreatedAt >= request.CreatedFrom.Value);
+        }
+
+        if (request.CreatedTo.HasValue)
+        {
+            var createdToInclusive = request.CreatedTo.Value.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(x => x.CreatedAt <= createdToInclusive);
+        }
+
+        var totalCount = await query.CountAsync();
+        var pageNumber = request.NormalizedPageNumber;
+        var pageSize = request.NormalizedPageSize;
+
+        var orders = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<ServiceOrderDto>
+        {
+            Items = orders.Select(MapToDto).ToArray(),
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 
     public async Task<ServiceOrderDto?> GetByIdAsync(int id)

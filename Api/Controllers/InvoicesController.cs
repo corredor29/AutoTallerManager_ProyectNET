@@ -19,9 +19,10 @@ public sealed class InvoicesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] GetInvoicesRequest request)
     {
-        var invoices = await _invoiceService.GetAllAsync();
+        var invoices = await _invoiceService.GetAllAsync(request);
+        Response.Headers.Append("X-Total-Count", invoices.TotalCount.ToString());
         return Ok(invoices);
     }
 
