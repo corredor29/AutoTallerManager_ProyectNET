@@ -1,11 +1,14 @@
 using Application.Contracts.Services;
 using Application.Requests.ServiceOrders;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.Staff)]
 public sealed class ServiceOrdersController : ControllerBase
 {
     private readonly IServiceOrderService _serviceOrderService;
@@ -35,6 +38,7 @@ public sealed class ServiceOrdersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrReceptionist)]
     public async Task<IActionResult> Create([FromBody] CreateServiceOrderRequest request)
     {
         var order = await _serviceOrderService.CreateAsync(request);
@@ -42,6 +46,7 @@ public sealed class ServiceOrdersController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.AdminOrMechanic)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateServiceOrderRequest request)
     {
         var updated = await _serviceOrderService.UpdateAsync(id, request);
@@ -54,6 +59,7 @@ public sealed class ServiceOrdersController : ControllerBase
     }
 
     [HttpPut("{id:int}/status")]
+    [Authorize(Roles = AppRoles.AdminOrMechanic)]
     public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeServiceOrderStatusRequest request)
     {
         var updated = await _serviceOrderService.ChangeStatusAsync(id, request);
@@ -66,6 +72,7 @@ public sealed class ServiceOrdersController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var removed = await _serviceOrderService.DeleteAsync(id);

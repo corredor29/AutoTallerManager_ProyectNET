@@ -75,8 +75,6 @@ namespace Infrastructure.Context
             modelBuilder.Ignore<PersonEmail>();
             modelBuilder.Ignore<PhoneCode>();
             modelBuilder.Ignore<PersonPhone>();
-            modelBuilder.Ignore<UserRole>();
-            modelBuilder.Ignore<Role>();
             modelBuilder.Ignore<VehicleOwnershipHistory>();
             modelBuilder.Ignore<MileageHistory>();
             modelBuilder.Ignore<AuditActionType>();
