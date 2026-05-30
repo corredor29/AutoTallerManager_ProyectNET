@@ -2,23 +2,28 @@ using Domain.Entities.Vehicles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastructure.Configurations.Vehicles;
-
-public sealed class VehicleColorConfiguration : IEntityTypeConfiguration<VehicleColor>
+namespace Infrastructure.Configurations.Vehicles
 {
-    public void Configure(EntityTypeBuilder<VehicleColor> builder)
+
+    public sealed class VehicleColorConfiguration : IEntityTypeConfiguration<VehicleColor>
     {
-        builder.ToTable("vehicle_colors");
+        public void Configure(EntityTypeBuilder<VehicleColor> builder)
+        {
+            builder.ToTable("VehicleColors");
 
-        builder.HasKey(x => x.Id);
+            builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Name)
-            .HasConversion(x => x.Value, value => new(value))
-            .HasMaxLength(50)
-            .HasColumnName("name")
-            .IsRequired();
+            builder.Property(x => x.Name)
+                .HasConversion(v => v.Value, v => new(v))
+                .HasMaxLength(50)
+                .IsRequired();
 
-        builder.HasIndex(x => x.Name)
-            .IsUnique();
+            builder.HasIndex(x => x.Name).IsUnique();
+
+            builder.HasMany(x => x.Vehicles)
+                .WithOne(x => x.Color)
+                .HasForeignKey(x => x.ColorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
     }
 }

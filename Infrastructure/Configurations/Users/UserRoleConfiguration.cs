@@ -1,33 +1,30 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastructure.Configurations.Users;
-
-public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
+namespace Infrastructure.Configurations.Users
 {
-    public void Configure(EntityTypeBuilder<UserRole> builder)
+    public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
     {
-        builder.ToTable("user_roles");
+        public void Configure(EntityTypeBuilder<UserRole> builder)
+        {
+            builder.ToTable("UserRoles");
 
-        builder.HasKey(x => new { x.UserId, x.RoleId });
+            builder.HasKey(x => new { x.UserId, x.RoleId });
 
-        builder.Property(x => x.UserId)
-            .HasColumnName("user_id")
-            .IsRequired();
+            builder.HasOne(x => x.User)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Property(x => x.RoleId)
-            .HasColumnName("role_id")
-            .IsRequired();
-
-        builder.HasOne(x => x.User)
-            .WithMany(x => x.UserRoles)
-            .HasForeignKey(x => x.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasOne(x => x.Role)
-            .WithMany(x => x.UserRoles)
-            .HasForeignKey(x => x.RoleId)
-            .OnDelete(DeleteBehavior.Cascade);
+            builder.HasOne(x => x.Role)
+                .WithMany(x => x.UserRoles)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
     }
 }
