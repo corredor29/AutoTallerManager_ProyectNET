@@ -11,6 +11,7 @@ namespace Application.Contracts.Repositories
         Task<User?>            GetByIdAsync(int id);
         Task<IEnumerable<User>> GetAllAsync();
         Task<User?>            GetByPersonIdAsync(int personId);
+        Task<User?>            GetByPrimaryEmailAsync(string emailUser, string emailDomain);
         Task<bool>             ExistsByPersonIdAsync(int personId);
         Task                   AddAsync(User user);
         void                   Update(User user);

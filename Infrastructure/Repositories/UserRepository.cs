@@ -39,6 +39,25 @@ namespace Infrastructure.Repositories
                                 .ThenInclude(x => x.Role)
                             .FirstOrDefaultAsync(x => x.PersonId == personId);
 
+        public async Task<User?> GetByPrimaryEmailAsync(string emailUser, string emailDomain)
+        {
+            var normalizedEmailUser = emailUser.Trim().ToLowerInvariant();
+            var normalizedEmailDomain = emailDomain.Trim().ToLowerInvariant();
+
+            var personId = await (
+                from personEmail in _context.PersonEmails
+                join domain in _context.EmailDomains on personEmail.EmailDomainId equals domain.Id
+                where personEmail.IsPrimary
+                    && personEmail.EmailUser.Value == normalizedEmailUser
+                    && domain.Domain.Value == normalizedEmailDomain
+                select (int?)personEmail.PersonId)
+                .FirstOrDefaultAsync();
+
+            return personId.HasValue
+                ? await GetByPersonIdAsync(personId.Value)
+                : null;
+        }
+
         public async Task<bool> ExistsByPersonIdAsync(int personId)
             => await _context.Users.AnyAsync(x => x.PersonId == personId);
 
