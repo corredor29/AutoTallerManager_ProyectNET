@@ -14,6 +14,7 @@ using Domain.ValueObject.Appointments.AppointmentStatus;
 using Domain.ValueObject.Persons.Person;
 using Domain.ValueObject.Users.Role;
 using Domain.ValueObject.Users.User;
+using Domain.ValueObject.Persons.PersonEmail;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Domain.Entities.Vehicles;
@@ -193,25 +194,73 @@ public sealed class DatabaseInitializer
 
     private async Task SeedDefaultAdminAsync()
     {
-        if (await _dbContext.Users.AnyAsync())
-        {
-            return;
-        }
-
         var adminRole = (await _dbContext.Roles.ToListAsync())
             .FirstOrDefault(x => x.RoleName.Value == "Admin")
             ?? throw new InvalidOperationException("Admin role must exist before seeding the default admin user.");
 
-        var person = new Person(new PersonFirstName("System"), new PersonLastName("Administrator"));
-        await _dbContext.Persons.AddAsync(person);
-        await _dbContext.SaveChangesAsync();
+        var adminUserId = await _dbContext.UserRoles
+            .Where(x => x.RoleId == adminRole.Id)
+            .Select(x => (int?)x.UserId)
+            .FirstOrDefaultAsync();
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!");
-        var user = new User(person.Id, new PasswordHash(passwordHash));
-        await _dbContext.Users.AddAsync(user);
-        await _dbContext.SaveChangesAsync();
+        User adminUser;
 
-        await _dbContext.UserRoles.AddAsync(new UserRole(user.Id, adminRole.Id));
+        if (adminUserId.HasValue)
+        {
+            adminUser = await _dbContext.Users.FirstAsync(x => x.Id == adminUserId.Value);
+        }
+        else
+        {
+            var person = new Person(new PersonFirstName("System"), new PersonLastName("Administrator"));
+            await _dbContext.Persons.AddAsync(person);
+            await _dbContext.SaveChangesAsync();
+
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!");
+            adminUser = new User(person.Id, new PasswordHash(passwordHash));
+            await _dbContext.Users.AddAsync(adminUser);
+            await _dbContext.SaveChangesAsync();
+
+            await _dbContext.UserRoles.AddAsync(new UserRole(adminUser.Id, adminRole.Id));
+            await _dbContext.SaveChangesAsync();
+        }
+
+        await EnsureDefaultAdminEmailAsync(adminUser.PersonId);
+    }
+
+    private async Task EnsureDefaultAdminEmailAsync(int personId)
+    {
+        var hasPrimaryEmail = await _dbContext.PersonEmails.AnyAsync(x => x.PersonId == personId && x.IsPrimary);
+        if (hasPrimaryEmail)
+        {
+            return;
+        }
+
+        var emailDomain = await _dbContext.EmailDomains
+            .FirstOrDefaultAsync(x => x.Domain.Value == "autotaller.local");
+
+        if (emailDomain is null)
+        {
+            emailDomain = new EmailDomain(new EmailDomainValue("autotaller.local"));
+            await _dbContext.EmailDomains.AddAsync(emailDomain);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        var existingAdminEmail = await _dbContext.PersonEmails.FirstOrDefaultAsync(x =>
+            x.PersonId == personId &&
+            x.EmailUser.Value == "admin" &&
+            x.EmailDomainId == emailDomain.Id);
+
+        if (existingAdminEmail is null)
+        {
+            existingAdminEmail = new PersonEmail(personId, emailDomain.Id, new EmailUser("admin"), true);
+            await _dbContext.PersonEmails.AddAsync(existingAdminEmail);
+        }
+        else
+        {
+            existingAdminEmail.SetAsPrimary();
+            _dbContext.PersonEmails.Update(existingAdminEmail);
+        }
+
         await _dbContext.SaveChangesAsync();
     }
     private async Task SeedDocumentTypesAsync()

@@ -71,8 +71,6 @@ namespace Infrastructure.Context
 
             modelBuilder.Ignore<PersonDocument>();
             modelBuilder.Ignore<DocumentType>();
-            modelBuilder.Ignore<EmailDomain>();
-            modelBuilder.Ignore<PersonEmail>();
             modelBuilder.Ignore<PhoneCode>();
             modelBuilder.Ignore<PersonPhone>();
             modelBuilder.Ignore<VehicleOwnershipHistory>();

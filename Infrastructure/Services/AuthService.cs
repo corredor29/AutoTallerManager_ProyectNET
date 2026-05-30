@@ -23,7 +23,17 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthResponseDto> LoginAsync(LoginRequest request)
     {
-        var user = await _userRepository.GetByIdAsync(request.UserId);
+        var emailParts = request.Email
+            .Trim()
+            .ToLowerInvariant()
+            .Split('@', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (emailParts.Length != 2)
+        {
+            throw new UnauthorizedAccessException("Invalid credentials.");
+        }
+
+        var user = await _userRepository.GetByPrimaryEmailAsync(emailParts[0], emailParts[1]);
         if (user is null || !user.IsActive)
         {
             throw new UnauthorizedAccessException("Invalid credentials.");

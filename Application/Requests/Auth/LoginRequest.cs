@@ -4,8 +4,10 @@ namespace Application.Requests.Auth;
 
 public sealed class LoginRequest
 {
-    [Range(1, int.MaxValue)]
-    public int UserId { get; init; }
+    [Required]
+    [EmailAddress]
+    [StringLength(255)]
+    public string Email { get; init; } = string.Empty;
 
     [Required]
     [StringLength(255, MinimumLength = 8)]
