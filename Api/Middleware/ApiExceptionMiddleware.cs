@@ -29,6 +29,7 @@ public sealed class ApiExceptionMiddleware
         var (statusCode, title) = exception switch
         {
             ArgumentException => (HttpStatusCode.BadRequest, "Invalid request"),
+            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized"),
             InvalidOperationException => (HttpStatusCode.Conflict, "Business rule violation"),
             _ => (HttpStatusCode.InternalServerError, "Unexpected error")
         };
