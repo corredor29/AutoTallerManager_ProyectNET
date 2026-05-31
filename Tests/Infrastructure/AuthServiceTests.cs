@@ -65,6 +65,7 @@ public sealed class AuthServiceTests
 
     private static AuthService CreateService(FakeUserRepository repository)
     {
+        var dbContext = DbContextFactory.Create();
         var options = Options.Create(new JwtOptions
         {
             Issuer = "tests",
@@ -73,6 +74,6 @@ public sealed class AuthServiceTests
             ExpirationMinutes = 60
         });
 
-        return new AuthService(repository, options);
+        return new AuthService(repository, options, dbContext);
     }
 }

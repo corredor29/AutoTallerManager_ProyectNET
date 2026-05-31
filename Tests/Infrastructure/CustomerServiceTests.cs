@@ -3,6 +3,8 @@ using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Mapster;
 using Application.Mapping;
+using Domain.Entities.Persons;
+using Domain.ValueObject.Persons.PhoneCode;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -48,6 +50,41 @@ public sealed class CustomerServiceTests
         var c2 = await service.CreateAsync(new CreateCustomerRequest { FirstName = "Luis", LastName = "Pérez" });
 
         c1.Id.Should().NotBe(c2.Id);
+    }
+
+    [Fact]
+    public async Task RegisterWithVehicleAsync_ValidRequest_CreatesCustomerContactAndVehicle()
+    {
+        var db = DbContextFactory.Create();
+        var service = CreateService(db);
+        var (_, modelId) = await SeedDataHelper.SeedVehicleModelAsync(db);
+
+        var phoneCode = new PhoneCode(new PhoneCodeValue("+57"), new PhoneCodeCountry("Colombia"));
+        await db.PhoneCodes.AddAsync(phoneCode);
+        await db.SaveChangesAsync();
+
+        var result = await service.RegisterWithVehicleAsync(new RegisterCustomerWithVehicleRequest
+        {
+            FirstName = "Laura",
+            LastName = "Ruiz",
+            Email = "laura.ruiz@gmail.com",
+            PhoneCodeId = phoneCode.Id,
+            PhoneNumber = "3001234567",
+            Vehicle = new RegisterVehicleRequest
+            {
+                ModelId = modelId,
+                Vin = "1HGCM82633A004399",
+                Year = 2022,
+                Mileage = 12000,
+                LicensePlate = "ABC123"
+            }
+        });
+
+        result.Customer.Person.PrimaryEmail.Should().Be("laura.ruiz@gmail.com");
+        result.Customer.Person.PrimaryPhone.Should().Be("+57 3001234567");
+        result.Vehicle.Vin.Should().Be("1HGCM82633A004399");
+
+        db.VehicleOwnershipHistories.Should().ContainSingle(x => x.CustomerId == result.Customer.Id && x.VehicleId == result.Vehicle.Id);
     }
 
     // ── DeleteAsync ──────────────────────────────────────────────────

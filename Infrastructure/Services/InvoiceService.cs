@@ -199,6 +199,11 @@ public sealed class InvoiceService : IInvoiceService
         {
             Id = invoice.Id,
             ServiceOrderId = invoice.ServiceOrderId,
+            CustomerId = invoice.ServiceOrder?.Appointment?.CustomerId,
+            CustomerName = invoice.ServiceOrder?.Appointment?.Customer?.Person is null
+                ? string.Empty
+                : $"{invoice.ServiceOrder.Appointment.Customer.Person.FirstName.Value} {invoice.ServiceOrder.Appointment.Customer.Person.LastName.Value}".Trim(),
+            VehicleVin = invoice.ServiceOrder?.Vehicle?.VIN.Value ?? string.Empty,
             QuotationId = invoice.QuotationId,
             IssuedAt = invoice.IssuedAt,
             LaborCost = invoice.LaborCost.Value,

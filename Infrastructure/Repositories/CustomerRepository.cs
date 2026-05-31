@@ -23,6 +23,12 @@ namespace Infrastructure.Repositories
             var query = _dbContext.Customers
                 .Include(c => c.Person)
                     .ThenInclude(p => p.Documents)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Emails)
+                        .ThenInclude(e => e.EmailDomain)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Phones)
+                        .ThenInclude(p => p.PhoneCode)
                 .AsQueryable();
 
             query = query
@@ -59,6 +65,11 @@ namespace Infrastructure.Repositories
         {
             return await _dbContext.Customers
                 .Include(c => c.Person)
+                    .ThenInclude(p => p.Emails)
+                        .ThenInclude(e => e.EmailDomain)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Phones)
+                        .ThenInclude(p => p.PhoneCode)
                 .FirstOrDefaultAsync(c => c.Id == id);
         }
 
@@ -66,6 +77,11 @@ namespace Infrastructure.Repositories
         {
             return await _dbContext.Customers
                 .Include(c => c.Person)
+                    .ThenInclude(p => p.Emails)
+                        .ThenInclude(e => e.EmailDomain)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Phones)
+                        .ThenInclude(p => p.PhoneCode)
                 .ToListAsync();
         }
 
