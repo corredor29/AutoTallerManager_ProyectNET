@@ -41,17 +41,20 @@ namespace Infrastructure.Repositories
 
         public async Task<User?> GetByPrimaryEmailAsync(string emailUser, string emailDomain)
         {
-            var normalizedEmailUser = emailUser.Trim().ToLowerInvariant();
+            var normalizedEmailUser   = emailUser.Trim().ToLowerInvariant();
             var normalizedEmailDomain = emailDomain.Trim().ToLowerInvariant();
 
-            var personId = await (
-                from personEmail in _context.PersonEmails
-                join domain in _context.EmailDomains on personEmail.EmailDomainId equals domain.Id
-                where personEmail.IsPrimary
-                    && personEmail.EmailUser.Value == normalizedEmailUser
-                    && domain.Domain.Value == normalizedEmailDomain
-                select (int?)personEmail.PersonId)
-                .FirstOrDefaultAsync();
+            // Traer a memoria y filtrar con LINQ
+            var personEmails = await _context.PersonEmails
+                .Include(pe => pe.EmailDomain)
+                .Where(pe => pe.IsPrimary)
+                .ToListAsync();
+
+            var personId = personEmails
+                .FirstOrDefault(pe =>
+                    pe.EmailUser.Value.ToLowerInvariant()      == normalizedEmailUser &&
+                    pe.EmailDomain.Domain.Value.ToLowerInvariant() == normalizedEmailDomain)
+                ?.PersonId;
 
             return personId.HasValue
                 ? await GetByPersonIdAsync(personId.Value)
