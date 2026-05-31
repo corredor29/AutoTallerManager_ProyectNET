@@ -170,9 +170,10 @@ namespace Infrastructure.Context
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            var actionTypes = await AuditActionTypes
+            var actionTypes = (await AuditActionTypes
+                .ToListAsync(cancellationToken))
                 .Where(x => actionNames.Contains(x.Name.Value))
-                .ToDictionaryAsync(x => x.Name.Value, x => x.Id, cancellationToken);
+                .ToDictionary(x => x.Name.Value, x => x.Id);
 
             if (actionTypes.Count == 0)
             {
