@@ -1,6 +1,8 @@
-using Application.Contracts.Services;
-using Application.Requests.Vehicles;
 using Api.Security;
+using Application.Common.Pagination;
+using Application.Contracts.Services;
+using Application.Filters;
+using Application.Requests.Vehicles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,7 +11,7 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
-    public class VehiclesController : ControllerBase
+    public sealed class VehiclesController : ControllerBase
     {
         private readonly IVehicleService _vehicleService;
 
@@ -19,11 +21,13 @@ namespace Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] GetVehiclesRequest request)
+        public async Task<IActionResult> GetAll(
+            [FromQuery] PaginationParams pagination,
+            [FromQuery] VehicleFilter filter)
         {
-            var vehicles = await _vehicleService.GetAllAsync(request);
-            Response.Headers.Append("X-Total-Count", vehicles.TotalCount.ToString());
-            return Ok(vehicles);
+            var result = await _vehicleService.GetAllPagedAsync(pagination, filter);
+            Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+            return Ok(result);
         }
 
         [HttpGet("{id:int}")]

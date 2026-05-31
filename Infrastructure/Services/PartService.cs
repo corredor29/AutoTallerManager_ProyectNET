@@ -2,6 +2,7 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Parts;
+using Application.Filters;
 using Application.Requests.Parts;
 using Domain.Entities.Parts;
 using Domain.ValueObject.Parts.Part;
@@ -21,52 +22,16 @@ public sealed class PartService : IPartService
         _dbContext = dbContext;
     }
 
-    public async Task<PagedResult<PartDto>> GetAllAsync(GetPartsRequest request)
+    public async Task<PagedResult<PartDto>> GetAllPagedAsync(
+        PaginationParams pagination, PartFilter filter)
     {
-        var query = _dbContext.Parts
-            .Include(x => x.Category)
-            .Include(x => x.Unit)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(request.Search))
-        {
-            var pattern = $"%{request.Search.Trim()}%";
-            query = query.Where(x =>
-                EF.Functions.ILike(x.Code.Value, pattern) ||
-                EF.Functions.ILike(x.Description.Value, pattern));
-        }
-
-        if (request.PartCategoryId.HasValue)
-        {
-            query = query.Where(x => x.PartCategoryId == request.PartCategoryId.Value);
-        }
-
-        if (request.IsActive.HasValue)
-        {
-            query = query.Where(x => x.IsActive == request.IsActive.Value);
-        }
-
-        if (request.LowStockOnly == true)
-        {
-            query = query.Where(x => x.Stock.Value <= x.MinStock.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-        var pageNumber = request.NormalizedPageNumber;
-        var pageSize = request.NormalizedPageSize;
-
-        var parts = await query
-            .OrderBy(x => x.Code.Value)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
+        var result = await _partRepository.GetAllPagedAsync(pagination, filter);
         return new PagedResult<PartDto>
         {
-            Items = parts.Select(MapToDto).ToArray(),
-            PageNumber = pageNumber,
-            PageSize = pageSize,
-            TotalCount = totalCount
+            Items      = result.Items.Select(MapToDto).ToArray(),
+            PageNumber = result.PageNumber,
+            PageSize   = result.PageSize,
+            TotalCount = result.TotalCount
         };
     }
 

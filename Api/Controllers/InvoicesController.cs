@@ -1,6 +1,8 @@
-using Application.Contracts.Services;
-using Application.Requests.Invoices;
 using Api.Security;
+using Application.Common.Pagination;
+using Application.Contracts.Services;
+using Application.Filters;
+using Application.Requests.Invoices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,11 +21,13 @@ public sealed class InvoicesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] GetInvoicesRequest request)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] PaginationParams pagination,
+        [FromQuery] InvoiceFilter filter)
     {
-        var invoices = await _invoiceService.GetAllAsync(request);
-        Response.Headers.Append("X-Total-Count", invoices.TotalCount.ToString());
-        return Ok(invoices);
+        var result = await _invoiceService.GetAllPagedAsync(pagination, filter);
+        Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+        return Ok(result);
     }
 
     [HttpGet("{id:int}")]

@@ -30,7 +30,7 @@ using Domain.ValueObject.Audit.AuditActionType;
 
 namespace Infrastructure.Data;
 
-public sealed class DatabaseInitializer
+public class DatabaseInitializer
 {
     private readonly AutoTallerDbContext _dbContext;
 
@@ -41,7 +41,10 @@ public sealed class DatabaseInitializer
 
     public async Task InitializeAsync()
     {
-        await _dbContext.Database.MigrateAsync();
+        if (_dbContext.Database.IsRelational())
+            await _dbContext.Database.MigrateAsync();
+        else
+            await _dbContext.Database.EnsureCreatedAsync();
 
         await SeedAppointmentStatusesAsync();
         await SeedOrderStatusesAsync();

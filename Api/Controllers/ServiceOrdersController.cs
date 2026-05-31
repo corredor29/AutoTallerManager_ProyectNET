@@ -1,6 +1,8 @@
-using Application.Contracts.Services;
-using Application.Requests.ServiceOrders;
 using Api.Security;
+using Application.Common.Pagination;
+using Application.Contracts.Services;
+using Application.Filters;
+using Application.Requests.ServiceOrders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,11 +23,13 @@ public sealed class ServiceOrdersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] GetServiceOrdersRequest request)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] PaginationParams pagination,
+        [FromQuery] ServiceOrderFilter filter)
     {
-        var orders = await _serviceOrderService.GetAllAsync(request);
-        Response.Headers.Append("X-Total-Count", orders.TotalCount.ToString());
-        return Ok(orders);
+        var result = await _serviceOrderService.GetAllPagedAsync(pagination, filter);
+        Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+        return Ok(result);
     }
 
     [HttpGet("{id:int}")]

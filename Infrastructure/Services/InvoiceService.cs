@@ -2,6 +2,7 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Invoices;
+using Application.Filters;
 using Application.Requests.Invoices;
 using Domain.Entities.Invoices;
 using Domain.ValueObject.Invoices.Invoice;
@@ -23,57 +24,16 @@ public sealed class InvoiceService : IInvoiceService
         _dbContext = dbContext;
     }
 
-    public async Task<PagedResult<InvoiceDto>> GetAllAsync(GetInvoicesRequest request)
+    public async Task<PagedResult<InvoiceDto>> GetAllPagedAsync(
+        PaginationParams pagination, InvoiceFilter filter)
     {
-        var query = _dbContext.Invoices.AsQueryable();
-
-        if (request.ServiceOrderId.HasValue)
-        {
-            query = query.Where(x => x.ServiceOrderId == request.ServiceOrderId.Value);
-        }
-
-        if (request.QuotationId.HasValue)
-        {
-            query = query.Where(x => x.QuotationId == request.QuotationId.Value);
-        }
-
-        if (request.IssuedFrom.HasValue)
-        {
-            query = query.Where(x => x.IssuedAt >= request.IssuedFrom.Value);
-        }
-
-        if (request.IssuedTo.HasValue)
-        {
-            var issuedToInclusive = request.IssuedTo.Value.Date.AddDays(1).AddTicks(-1);
-            query = query.Where(x => x.IssuedAt <= issuedToInclusive);
-        }
-
-        if (request.MinTotal.HasValue)
-        {
-            query = query.Where(x => x.Total.Value >= request.MinTotal.Value);
-        }
-
-        if (request.MaxTotal.HasValue)
-        {
-            query = query.Where(x => x.Total.Value <= request.MaxTotal.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-        var pageNumber = request.NormalizedPageNumber;
-        var pageSize = request.NormalizedPageSize;
-
-        var invoices = await query
-            .OrderByDescending(x => x.IssuedAt)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
+        var result = await _invoiceRepository.GetAllPagedAsync(pagination, filter);
         return new PagedResult<InvoiceDto>
         {
-            Items = invoices.Select(MapToDto).ToArray(),
-            PageNumber = pageNumber,
-            PageSize = pageSize,
-            TotalCount = totalCount
+            Items      = result.Items.Select(MapToDto).ToArray(),
+            PageNumber = result.PageNumber,
+            PageSize   = result.PageSize,
+            TotalCount = result.TotalCount
         };
     }
 

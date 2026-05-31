@@ -1,6 +1,8 @@
-using Application.Contracts.Services;
-using Application.Requests.Parts;
 using Api.Security;
+using Application.Common.Pagination;
+using Application.Contracts.Services;
+using Application.Filters;
+using Application.Requests.Parts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,11 +23,13 @@ public sealed class PartsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] GetPartsRequest request)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] PaginationParams pagination,
+        [FromQuery] PartFilter filter)
     {
-        var parts = await _partService.GetAllAsync(request);
-        Response.Headers.Append("X-Total-Count", parts.TotalCount.ToString());
-        return Ok(parts);
+        var result = await _partService.GetAllPagedAsync(pagination, filter);
+        Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+        return Ok(result);
     }
 
     [HttpGet("{id:int}")]

@@ -2,7 +2,9 @@ using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Quotations;
 using Application.Requests.Quotations;
+using Domain.Entities.Invoices;
 using Domain.Entities.Quotations;
+using Domain.ValueObject.Invoices.Invoice;
 using Domain.ValueObject.Quotations.Quotation;
 using Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
@@ -103,6 +105,7 @@ public sealed class QuotationService : IQuotationService
         else if (statusName.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
         {
             quotation.Reject(new RejectionReason(request.RejectionReason));
+            await CreateDiagnosisOnlyInvoiceAsync(quotation);
         }
 
         _quotationRepository.Update(quotation);
@@ -121,6 +124,27 @@ public sealed class QuotationService : IQuotationService
         _quotationRepository.Remove(quotation);
         await _dbContext.SaveChangesAsync();
         return true;
+    }
+
+    private async Task CreateDiagnosisOnlyInvoiceAsync(Quotation quotation)
+    {
+        var alreadyHasInvoice = await _dbContext.Invoices
+            .AnyAsync(x => x.ServiceOrderId == quotation.ServiceOrderId);
+
+        if (alreadyHasInvoice) return;
+
+        var diagnosticCost = quotation.LaborCost.Value;
+
+        var invoice = new Invoice(
+            quotation.ServiceOrderId,
+            new InvoiceLaborCost(diagnosticCost),
+            new InvoiceSubtotal(diagnosticCost),
+            new InvoiceTax(0m),
+            new InvoiceTotal(diagnosticCost),
+            diagnosisOnlyCharged: true,
+            quotationId: quotation.Id);
+
+        await _dbContext.Invoices.AddAsync(invoice);
     }
 
     private async Task EnsureRelatedEntitiesExistAsync(int serviceOrderId, int createdByUserId, int quotationStatusId)

@@ -82,13 +82,6 @@ namespace Infrastructure.Context
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Ignore<PersonDocument>();
-            modelBuilder.Ignore<DocumentType>();
-            modelBuilder.Ignore<PhoneCode>();
-            modelBuilder.Ignore<PersonPhone>();
-            modelBuilder.Ignore<VehicleOwnershipHistory>();
-            modelBuilder.Ignore<MileageHistory>();
-
             modelBuilder.ApplyConfigurationsFromAssembly(
                 typeof(AutoTallerDbContext).Assembly
             );
