@@ -1,11 +1,15 @@
+using System.Security.Claims;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.ServiceOrderParts;
 using Application.Requests.ServiceOrderParts;
+using Domain.Entities.Audit;
 using Domain.Entities.Parts;
+using Domain.ValueObject.Audit.AuditLog;
 using Domain.ValueObject.Parts.Part;
 using Domain.ValueObject.Parts.ServiceOrderPart;
 using Infrastructure.Context;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
@@ -14,11 +18,16 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
 {
     private readonly IServiceOrderPartRepository _serviceOrderPartRepository;
     private readonly AutoTallerDbContext _dbContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public ServiceOrderPartService(IServiceOrderPartRepository serviceOrderPartRepository, AutoTallerDbContext dbContext)
+    public ServiceOrderPartService(
+        IServiceOrderPartRepository serviceOrderPartRepository,
+        AutoTallerDbContext dbContext,
+        IHttpContextAccessor httpContextAccessor)
     {
         _serviceOrderPartRepository = serviceOrderPartRepository;
         _dbContext = dbContext;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<IEnumerable<ServiceOrderPartDto>> GetAllAsync()
@@ -41,10 +50,17 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
         var quantity = new ServiceOrderPartQuantity(request.Quantity);
         if (!part.HasSufficientStock(quantity.Value))
         {
-            throw new InvalidOperationException($"Part {request.PartId} does not have enough stock.");
+            throw new InvalidOperationException(
+                $"Insufficient stock for part '{part.Code.Value}'. " +
+                $"Available: {part.Stock.Value}, Requested: {quantity.Value}");
         }
 
         part.RemoveStock(new PartStock(quantity.Value));
+
+        if (part.IsBelowMinStock())
+        {
+            await LogLowStockWarningAsync(part);
+        }
 
         var item = new ServiceOrderPart(
             request.ServiceOrderId,
@@ -118,6 +134,44 @@ public sealed class ServiceOrderPartService : IServiceOrderPartService
         _serviceOrderPartRepository.Remove(item);
         await _dbContext.SaveChangesAsync();
         return true;
+    }
+
+    private async Task LogLowStockWarningAsync(Part part)
+    {
+        var updateActionTypeId = await _dbContext.AuditActionTypes
+            .Where(a => a.Name.Value.ToLower() == "update")
+            .Select(a => a.Id)
+            .FirstOrDefaultAsync();
+
+        if (updateActionTypeId == 0) return;
+
+        int? userId = null;
+        var principal = _httpContextAccessor.HttpContext?.User;
+        if (principal?.Identity?.IsAuthenticated == true)
+        {
+            var sub = principal.FindFirstValue("sub")
+                   ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (int.TryParse(sub, out var parsed))
+                userId = parsed;
+        }
+
+        userId ??= await _dbContext.Users
+            .OrderBy(u => u.Id)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+
+        if (userId is null) return;
+
+        var description =
+            $"Low stock warning: Part '{part.Code.Value}' has {part.Stock.Value} unit(s), " +
+            $"below minimum ({part.MinStock.Value}). Reorder required.";
+
+        _dbContext.AuditLogs.Add(new AuditLog(
+            userId.Value,
+            updateActionTypeId,
+            new AffectedEntityName("Part"),
+            part.Id,
+            new AuditDescription(description)));
     }
 
     private async Task<Part> EnsureRelatedEntitiesExistAsync(int serviceOrderId, int partId)

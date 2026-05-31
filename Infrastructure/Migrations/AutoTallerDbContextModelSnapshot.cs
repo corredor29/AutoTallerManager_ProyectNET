@@ -1777,7 +1777,7 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Vehicles.MileageHistory", b =>
                 {
                     b.HasOne("Domain.Entities.Vehicles.Vehicle", "Vehicle")
-                        .WithMany()
+                        .WithMany("MileageHistories")
                         .HasForeignKey("VehicleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2015,6 +2015,8 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Entities.Vehicles.Vehicle", b =>
                 {
                     b.Navigation("Appointments");
+
+                    b.Navigation("MileageHistories");
 
                     b.Navigation("Ownerships");
 

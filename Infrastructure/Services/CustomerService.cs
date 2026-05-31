@@ -2,6 +2,7 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Customers;
+using Application.Filters;
 using Application.Requests.Customers;
 using Domain.Entities.Customers;
 using Domain.Entities.Persons;
@@ -23,42 +24,16 @@ namespace Infrastructure.Services
             _dbContext = dbContext;
         }
 
-        public async Task<PagedResult<CustomerDto>> GetAllAsync(GetCustomersRequest request)
+        public async Task<PagedResult<CustomerDto>> GetAllPagedAsync(
+            PaginationParams pagination, CustomerFilter filter)
         {
-            var query = _dbContext.Customers
-                .Include(x => x.Person)
-                .AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(request.Search))
-            {
-                var pattern = $"%{request.Search.Trim()}%";
-                query = query.Where(x =>
-                    EF.Functions.ILike(x.Person.FirstName.Value, pattern) ||
-                    EF.Functions.ILike(x.Person.LastName.Value, pattern));
-            }
-
-            if (request.IsActive.HasValue)
-            {
-                query = query.Where(x => x.Status.IsActive == request.IsActive.Value);
-            }
-
-            var totalCount = await query.CountAsync();
-            var pageNumber = request.NormalizedPageNumber;
-            var pageSize = request.NormalizedPageSize;
-
-            var customers = await query
-                .OrderBy(x => x.Person.FirstName.Value)
-                .ThenBy(x => x.Person.LastName.Value)
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
+            var result = await _customerRepository.GetAllPagedAsync(pagination, filter);
             return new PagedResult<CustomerDto>
             {
-                Items = customers.Select(x => x.Adapt<CustomerDto>()).ToArray(),
-                PageNumber = pageNumber,
-                PageSize = pageSize,
-                TotalCount = totalCount
+                Items      = result.Items.Select(c => c.Adapt<CustomerDto>()).ToArray(),
+                PageNumber = result.PageNumber,
+                PageSize   = result.PageSize,
+                TotalCount = result.TotalCount
             };
         }
 

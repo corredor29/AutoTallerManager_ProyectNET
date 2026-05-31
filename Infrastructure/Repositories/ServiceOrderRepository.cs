@@ -1,6 +1,9 @@
+using Application.Common.Pagination;
 using Application.Contracts.Repositories;
+using Application.Filters;
 using Domain.Entities.ServiceOrders;
 using Infrastructure.Context;
+using Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
@@ -12,6 +15,46 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
     public ServiceOrderRepository(AutoTallerDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<PagedResult<ServiceOrder>> GetAllPagedAsync(
+        PaginationParams pagination, ServiceOrderFilter filter)
+    {
+        var query = _dbContext.ServiceOrders
+            .Include(x => x.Vehicle)
+                .ThenInclude(x => x.Model)
+                    .ThenInclude(x => x.Brand)
+            .Include(x => x.ServiceType)
+            .Include(x => x.OrderStatus)
+            .Include(x => x.Mechanic)
+                .ThenInclude(x => x.Person)
+            .AsQueryable();
+
+        query = query
+            .WhereIf(filter.OrderStatusId.HasValue, x => x.OrderStatusId == filter.OrderStatusId!.Value)
+            .WhereIf(filter.MechanicId.HasValue,    x => x.MechanicId    == filter.MechanicId!.Value)
+            .WhereIf(filter.ServiceTypeId.HasValue, x => x.ServiceTypeId == filter.ServiceTypeId!.Value)
+            .WhereIf(filter.DateFrom.HasValue,      x => x.CreatedAt >= filter.DateFrom!.Value)
+            .WhereIf(filter.DateTo.HasValue,
+                x => x.CreatedAt <= filter.DateTo!.Value.Date.AddDays(1).AddTicks(-1));
+
+        var totalCount = await query.CountAsync();
+        var page = pagination.NormalizedPageNumber;
+        var size = pagination.NormalizedPageSize;
+
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync();
+
+        return new PagedResult<ServiceOrder>
+        {
+            Items      = items,
+            PageNumber = page,
+            PageSize   = size,
+            TotalCount = totalCount
+        };
     }
 
     public async Task<ServiceOrder?> GetByIdAsync(int id)
@@ -47,6 +90,19 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
             x.VehicleId == vehicleId &&
             x.ClosedAt == null &&
             (!excludeId.HasValue || x.Id != excludeId.Value));
+    }
+
+    public async Task<bool> HasActiveOrderForVehicleAsync(int vehicleId)
+    {
+        var activeStatusIds = await _dbContext.OrderStatuses
+            .Where(s => s.Name.Value.ToLower() == "pending" ||
+                        s.Name.Value.ToLower() == "in progress")
+            .Select(s => s.Id)
+            .ToListAsync();
+
+        return await _dbContext.ServiceOrders.AnyAsync(x =>
+            x.VehicleId == vehicleId &&
+            activeStatusIds.Contains(x.OrderStatusId));
     }
 
     public async Task AddAsync(ServiceOrder serviceOrder)

@@ -2,6 +2,7 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.ServiceOrders;
+using Application.Filters;
 using Application.Requests.ServiceOrders;
 using Domain.Entities.ServiceOrders;
 using Domain.ValueObject.ServiceOrders.ServiceOrder;
@@ -24,66 +25,16 @@ public sealed class ServiceOrderService : IServiceOrderService
         _dbContext = dbContext;
     }
 
-    public async Task<PagedResult<ServiceOrderDto>> GetAllAsync(GetServiceOrdersRequest request)
+    public async Task<PagedResult<ServiceOrderDto>> GetAllPagedAsync(
+        PaginationParams pagination, ServiceOrderFilter filter)
     {
-        var query = _dbContext.ServiceOrders
-            .Include(x => x.Vehicle)
-                .ThenInclude(x => x.Model)
-                    .ThenInclude(x => x.Brand)
-            .Include(x => x.ServiceType)
-            .Include(x => x.OrderStatus)
-            .Include(x => x.Mechanic)
-                .ThenInclude(x => x.Person)
-            .AsQueryable();
-
-        if (request.VehicleId.HasValue)
-        {
-            query = query.Where(x => x.VehicleId == request.VehicleId.Value);
-        }
-
-        if (request.MechanicId.HasValue)
-        {
-            query = query.Where(x => x.MechanicId == request.MechanicId.Value);
-        }
-
-        if (request.OrderStatusId.HasValue)
-        {
-            query = query.Where(x => x.OrderStatusId == request.OrderStatusId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Vin))
-        {
-            var pattern = $"%{request.Vin.Trim()}%";
-            query = query.Where(x => EF.Functions.ILike(x.Vehicle.VIN.Value, pattern));
-        }
-
-        if (request.CreatedFrom.HasValue)
-        {
-            query = query.Where(x => x.CreatedAt >= request.CreatedFrom.Value);
-        }
-
-        if (request.CreatedTo.HasValue)
-        {
-            var createdToInclusive = request.CreatedTo.Value.Date.AddDays(1).AddTicks(-1);
-            query = query.Where(x => x.CreatedAt <= createdToInclusive);
-        }
-
-        var totalCount = await query.CountAsync();
-        var pageNumber = request.NormalizedPageNumber;
-        var pageSize = request.NormalizedPageSize;
-
-        var orders = await query
-            .OrderByDescending(x => x.CreatedAt)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
+        var result = await _serviceOrderRepository.GetAllPagedAsync(pagination, filter);
         return new PagedResult<ServiceOrderDto>
         {
-            Items = orders.Select(MapToDto).ToArray(),
-            PageNumber = pageNumber,
-            PageSize = pageSize,
-            TotalCount = totalCount
+            Items      = result.Items.Select(MapToDto).ToArray(),
+            PageNumber = result.PageNumber,
+            PageSize   = result.PageSize,
+            TotalCount = result.TotalCount
         };
     }
 
@@ -102,9 +53,18 @@ public sealed class ServiceOrderService : IServiceOrderService
             request.OrderStatusId,
             request.AppointmentId);
 
-        if (await _serviceOrderRepository.HasOpenOrderForVehicleAsync(request.VehicleId))
+        if (await _serviceOrderRepository.HasActiveOrderForVehicleAsync(request.VehicleId))
         {
-            throw new InvalidOperationException($"Vehicle {request.VehicleId} already has an open service order.");
+            throw new InvalidOperationException(
+                $"Vehicle {request.VehicleId} already has an active service order (Pending or In Progress).");
+        }
+
+        var estimatedDeliveryAt = request.EstimatedDeliveryAt;
+        if (!estimatedDeliveryAt.HasValue)
+        {
+            var serviceType = await _dbContext.ServiceTypes.FindAsync(request.ServiceTypeId);
+            var durationHours = serviceType?.EstimatedDuration.Value ?? 2;
+            estimatedDeliveryAt = DateTime.UtcNow.AddHours(durationHours);
         }
 
         var order = new ServiceOrder(
@@ -115,7 +75,7 @@ public sealed class ServiceOrderService : IServiceOrderService
             new WorkDescription(request.WorkPerformed),
             new ServiceOrderNotes(request.Notes),
             request.AppointmentId,
-            request.EstimatedDeliveryAt);
+            estimatedDeliveryAt);
 
         if (await ShouldCloseOrderAsync(request.OrderStatusId))
         {

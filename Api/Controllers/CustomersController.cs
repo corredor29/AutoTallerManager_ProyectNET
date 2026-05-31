@@ -1,6 +1,8 @@
-using Application.Contracts.Services;
-using Application.Requests.Customers;
 using Api.Security;
+using Application.Common.Pagination;
+using Application.Contracts.Services;
+using Application.Filters;
+using Application.Requests.Customers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,7 +11,7 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
-    public class CustomersController : ControllerBase
+    public sealed class CustomersController : ControllerBase
     {
         private readonly ICustomerService _customerService;
 
@@ -19,11 +21,13 @@ namespace Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] GetCustomersRequest request)
+        public async Task<IActionResult> GetAll(
+            [FromQuery] PaginationParams pagination,
+            [FromQuery] CustomerFilter filter)
         {
-            var customers = await _customerService.GetAllAsync(request);
-            Response.Headers.Append("X-Total-Count", customers.TotalCount.ToString());
-            return Ok(customers);
+            var result = await _customerService.GetAllPagedAsync(pagination, filter);
+            Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+            return Ok(result);
         }
 
         [HttpGet("{id:int}")]

@@ -2,7 +2,7 @@ namespace Application.Common.Pagination;
 
 public abstract class PagedQuery
 {
-    private const int MaxPageSize = 100;
+    private const int MaxPageSize = 50;
 
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;
