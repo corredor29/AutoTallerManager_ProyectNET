@@ -11,6 +11,8 @@ namespace Infrastructure.Services;
 
 public sealed class AppointmentService : IAppointmentService
 {
+    private static readonly string[] ActiveAppointmentStatuses = ["pending", "confirmed"];
+
     private readonly IAppointmentRepository _appointmentRepository;
     private readonly AutoTallerDbContext _dbContext;
 
@@ -40,6 +42,11 @@ public sealed class AppointmentService : IAppointmentService
             request.ServiceTypeId,
             request.AppointmentStatusId,
             request.AssignedUserId);
+
+        await EnsureMechanicAvailabilityAsync(
+            request.AssignedUserId,
+            request.AppointmentDate,
+            request.ServiceTypeId);
 
         var appointment = new Appointment(
             request.CustomerId,
@@ -72,6 +79,12 @@ public sealed class AppointmentService : IAppointmentService
         {
             throw new ArgumentException($"Assigned user {request.AssignedUserId.Value} does not exist or is inactive.");
         }
+
+        await EnsureMechanicAvailabilityAsync(
+            request.AssignedUserId,
+            request.AppointmentDate,
+            appointment.ServiceTypeId,
+            appointment.Id);
 
         appointment.Update(
             new AppointmentDate(request.AppointmentDate),
@@ -151,6 +164,52 @@ public sealed class AppointmentService : IAppointmentService
             !await _dbContext.Users.AnyAsync(x => x.Id == assignedUserId.Value && x.IsActive))
         {
             throw new ArgumentException($"Assigned user {assignedUserId.Value} does not exist or is inactive.");
+        }
+    }
+
+    private async Task EnsureMechanicAvailabilityAsync(
+        int? assignedUserId,
+        DateTime appointmentDate,
+        int serviceTypeId,
+        int? excludeAppointmentId = null)
+    {
+        if (!assignedUserId.HasValue)
+        {
+            return;
+        }
+
+        var durationHours = await _dbContext.ServiceTypes
+            .Where(x => x.Id == serviceTypeId)
+            .Select(x => x.EstimatedDuration.Value)
+            .FirstOrDefaultAsync();
+
+        var startAt = appointmentDate;
+        var endAt = appointmentDate.AddHours(durationHours.GetValueOrDefault() > 0 ? durationHours.Value : 1);
+
+        var hasConflictingAppointment = await _dbContext.Appointments
+            .Where(x => x.AssignedUserId == assignedUserId.Value)
+            .Where(x => !excludeAppointmentId.HasValue || x.Id != excludeAppointmentId.Value)
+            .Where(x => ActiveAppointmentStatuses.Contains(x.AppointmentStatus.Name.Value.ToLower()))
+            .AnyAsync(x =>
+                x.AppointmentDate.Value < endAt &&
+                x.AppointmentDate.Value.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1) > startAt);
+
+        if (hasConflictingAppointment)
+        {
+            throw new InvalidOperationException(
+                $"Mechanic {assignedUserId.Value} already has another appointment scheduled in that time range.");
+        }
+
+        var hasConflictingServiceOrder = await _dbContext.ServiceOrders
+            .Where(x => x.MechanicId == assignedUserId.Value && x.ClosedAt == null)
+            .AnyAsync(x =>
+                x.CreatedAt < endAt &&
+                (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1)) > startAt);
+
+        if (hasConflictingServiceOrder)
+        {
+            throw new InvalidOperationException(
+                $"Mechanic {assignedUserId.Value} already has a service order in progress for that time range.");
         }
     }
 

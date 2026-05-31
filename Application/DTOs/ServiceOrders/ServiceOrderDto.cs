@@ -3,6 +3,8 @@ namespace Application.DTOs.ServiceOrders;
 public sealed class ServiceOrderDto
 {
     public int Id { get; init; }
+    public int? CustomerId { get; init; }
+    public string CustomerName { get; init; } = string.Empty;
     public int VehicleId { get; init; }
     public string VehicleVin { get; init; } = string.Empty;
     public string VehicleDisplayName { get; init; } = string.Empty;

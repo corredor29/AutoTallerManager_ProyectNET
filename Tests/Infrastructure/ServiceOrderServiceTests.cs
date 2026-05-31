@@ -1,6 +1,13 @@
 using Application.Common.Pagination;
 using Application.Filters;
 using Application.Requests.ServiceOrders;
+using Domain.Entities.Appointments;
+using Domain.Entities.Customers;
+using Domain.Entities.Persons;
+using Domain.Entities.ServiceOrders;
+using Domain.ValueObject.Appointments.Appointment;
+using Domain.ValueObject.Persons.Person;
+using Domain.ValueObject.ServiceOrders.ServiceOrder;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
 
@@ -104,6 +111,43 @@ public sealed class ServiceOrderServiceTests
         result.EstimatedDeliveryAt.Should().BeCloseTo(clientDate, TimeSpan.FromSeconds(1));
     }
 
+    [Fact]
+    public async Task CreateAsync_MechanicHasConflictingAppointment_ThrowsInvalidOperationException()
+    {
+        var db = DbContextFactory.Create();
+        var service = CreateService(db);
+        var (vehicleId, serviceTypeId, mechanicId, pendingId) = await SeedPrerequisitesAsync(db);
+        var appointmentStatusId = await SeedDataHelper.SeedAppointmentStatusPendingAsync(db);
+        var person = new Person(new PersonFirstName("Marta"), new PersonLastName("Diaz"));
+        await db.Persons.AddAsync(person);
+        await db.SaveChangesAsync();
+
+        var customer = new Customer(person.Id);
+        await db.Customers.AddAsync(customer);
+        await db.SaveChangesAsync();
+
+        await db.Appointments.AddAsync(new Appointment(
+            customer.Id,
+            vehicleId,
+            serviceTypeId,
+            appointmentStatusId,
+            new AppointmentDate(DateTime.UtcNow.AddMinutes(15)),
+            new AppointmentNotes("Reserved slot"),
+            mechanicId));
+        await db.SaveChangesAsync();
+
+        var act = () => service.CreateAsync(
+            BuildRequest(
+                vehicleId,
+                serviceTypeId,
+                mechanicId,
+                pendingId,
+                DateTime.UtcNow.AddHours(2)));
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already has an appointment scheduled*");
+    }
+
     // ── ChangeStatusAsync ────────────────────────────────────────────
 
     [Fact]
@@ -158,5 +202,80 @@ public sealed class ServiceOrderServiceTests
 
         result.TotalCount.Should().Be(1);
         result.Items.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task GetAllPagedAsync_FilterByCustomerId_ReturnsOnlyMatchingOrders()
+    {
+        var db = DbContextFactory.Create();
+        var service = CreateService(db);
+        var statuses = await SeedDataHelper.SeedOrderStatusesAsync(db);
+        var appointmentStatusId = await SeedDataHelper.SeedAppointmentStatusPendingAsync(db);
+        var serviceTypes = await SeedDataHelper.SeedServiceTypesAsync(db);
+        var (_, modelId) = await SeedDataHelper.SeedVehicleModelAsync(db);
+        var vehicleId = await SeedDataHelper.SeedVehicleAsync(db, modelId);
+        var (_, mechanicId) = await SeedDataHelper.SeedMechanicAsync(db);
+
+        var personA = new Person(new PersonFirstName("Paula"), new PersonLastName("Lopez"));
+        var personB = new Person(new PersonFirstName("Diego"), new PersonLastName("Rios"));
+        await db.Persons.AddRangeAsync(personA, personB);
+        await db.SaveChangesAsync();
+
+        var customerA = new Customer(personA.Id);
+        var customerB = new Customer(personB.Id);
+        await db.Customers.AddRangeAsync(customerA, customerB);
+        await db.SaveChangesAsync();
+
+        var appointmentA = new Appointment(
+            customerA.Id,
+            vehicleId,
+            serviceTypes.DiagnosticsId,
+            appointmentStatusId,
+            new AppointmentDate(DateTime.UtcNow.AddDays(1)),
+            new AppointmentNotes("Customer A"),
+            mechanicId);
+
+        var appointmentB = new Appointment(
+            customerB.Id,
+            vehicleId,
+            serviceTypes.DiagnosticsId,
+            appointmentStatusId,
+            new AppointmentDate(DateTime.UtcNow.AddDays(2)),
+            new AppointmentNotes("Customer B"),
+            mechanicId);
+
+        await db.Appointments.AddRangeAsync(appointmentA, appointmentB);
+        await db.SaveChangesAsync();
+
+        await db.ServiceOrders.AddRangeAsync(
+            new ServiceOrder(
+                vehicleId,
+                serviceTypes.DiagnosticsId,
+                mechanicId,
+                statuses.PendingId,
+                new WorkDescription("Order A"),
+                new ServiceOrderNotes("Notes A"),
+                appointmentA.Id,
+                DateTime.UtcNow.AddDays(1).AddHours(2)),
+            new ServiceOrder(
+                vehicleId,
+                serviceTypes.RepairId,
+                mechanicId,
+                statuses.PendingId,
+                new WorkDescription("Order B"),
+                new ServiceOrderNotes("Notes B"),
+                appointmentB.Id,
+                DateTime.UtcNow.AddDays(2).AddHours(4)));
+        await db.SaveChangesAsync();
+
+        var result = await service.GetAllPagedAsync(
+            new PaginationParams { PageNumber = 1, PageSize = 10 },
+            new ServiceOrderFilter { CustomerId = customerA.Id });
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle();
+        var order = result.Items.Single();
+        order.CustomerId.Should().Be(customerA.Id);
+        order.CustomerName.Should().Be("Paula Lopez");
     }
 }
