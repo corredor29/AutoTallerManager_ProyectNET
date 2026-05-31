@@ -239,7 +239,7 @@ public class DatabaseInitializer
         }
 
         var emailDomain = await _dbContext.EmailDomains
-            .FirstOrDefaultAsync(x => x.Domain.Value == "autotaller.local");
+            .FirstOrDefaultAsync(x => x.Domain == new EmailDomainValue("autotaller.local"));
 
         if (emailDomain is null)
         {
@@ -248,10 +248,12 @@ public class DatabaseInitializer
             await _dbContext.SaveChangesAsync();
         }
 
-        var existingAdminEmail = await _dbContext.PersonEmails.FirstOrDefaultAsync(x =>
-            x.PersonId == personId &&
-            x.EmailUser.Value == "admin" &&
-            x.EmailDomainId == emailDomain.Id);
+        var existingAdminEmail = (await _dbContext.PersonEmails
+            .Where(x =>
+                x.PersonId == personId &&
+                x.EmailDomainId == emailDomain.Id)
+            .ToListAsync())
+            .FirstOrDefault(x => x.EmailUser.Value == "admin");
 
         if (existingAdminEmail is null)
         {
