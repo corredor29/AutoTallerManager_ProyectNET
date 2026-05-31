@@ -146,7 +146,21 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
 });
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFront", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:5500",
+                "http://127.0.0.1:5500",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -164,6 +178,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ApiExceptionMiddleware>();
+app.UseCors("AllowFront");
 app.UseHttpsRedirection();
 app.UseRateLimiter();
 app.UseAuthentication();

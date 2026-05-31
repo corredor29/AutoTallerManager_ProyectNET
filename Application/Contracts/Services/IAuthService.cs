@@ -6,4 +6,5 @@ namespace Application.Contracts.Services;
 public interface IAuthService
 {
     Task<AuthResponseDto> LoginAsync(LoginRequest request);
+    Task<AuthResponseDto> RegisterAsync(RegisterRequest request);
 }
