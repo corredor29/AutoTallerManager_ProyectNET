@@ -2,7 +2,7 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Customers;
-using Application.DTOs.Vehicles;
+using Application.DTOs.Persons;
 using Application.Filters;
 using Application.Requests.Customers;
 using Domain.Entities.Customers;
@@ -15,6 +15,10 @@ using Domain.ValueObject.Persons.PersonPhone;
 using Domain.ValueObject.Vehicles.Vehicle;
 using Infrastructure.Context;
 using Mapster;
+using Domain.ValueObject.Persons.EmailDomain;
+using Domain.ValueObject.Persons.PersonEmail;
+using Domain.ValueObject.Persons.PersonPhone;
+using Domain.ValueObject.Persons.PersonDocument;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services
@@ -22,12 +26,12 @@ namespace Infrastructure.Services
     public sealed class CustomerService : ICustomerService
     {
         private readonly ICustomerRepository _customerRepository;
-        private readonly AutoTallerDbContext _dbContext;
+        private readonly AutoTallerDbContext  _dbContext;
 
         public CustomerService(ICustomerRepository customerRepository, AutoTallerDbContext dbContext)
         {
             _customerRepository = customerRepository;
-            _dbContext = dbContext;
+            _dbContext          = dbContext;
         }
 
         public async Task<PagedResult<CustomerDto>> GetAllPagedAsync(
@@ -36,7 +40,7 @@ namespace Infrastructure.Services
             var result = await _customerRepository.GetAllPagedAsync(pagination, filter);
             return new PagedResult<CustomerDto>
             {
-                Items      = result.Items.Select(c => c.Adapt<CustomerDto>()).ToArray(),
+                Items      = result.Items.Select(MapToDto).ToArray(),
                 PageNumber = result.PageNumber,
                 PageSize   = result.PageSize,
                 TotalCount = result.TotalCount
@@ -46,21 +50,66 @@ namespace Infrastructure.Services
         public async Task<CustomerDto?> GetByIdAsync(int id)
         {
             var customer = await _customerRepository.GetByIdAsync(id);
-            return customer?.Adapt<CustomerDto>();
+            return customer is null ? null : MapToDto(customer);
         }
 
         public async Task<CustomerDto> CreateAsync(CreateCustomerRequest request)
         {
-            var person = new Person(new PersonFirstName(request.FirstName), new PersonLastName(request.LastName));
+            var person = new Person(
+                new PersonFirstName(request.FirstName),
+                new PersonLastName(request.LastName));
+
             await _dbContext.Persons.AddAsync(person);
+            await _dbContext.SaveChangesAsync();
+
+            // Guardar email
+            if (!string.IsNullOrWhiteSpace(request.Email))
+            {
+                var parts = request.Email.Trim().ToLowerInvariant().Split('@');
+                if (parts.Length == 2)
+                {
+                    var allDomains = await _dbContext.EmailDomains.ToListAsync();
+                    var domain = allDomains.FirstOrDefault(d => d.Domain.Value == parts[1]);
+                    if (domain is null)
+                    {
+                        domain = new EmailDomain(new EmailDomainValue(parts[1]));
+                        await _dbContext.EmailDomains.AddAsync(domain);
+                        await _dbContext.SaveChangesAsync();
+                    }
+                    var personEmail = new PersonEmail(person.Id, domain.Id, new EmailUser(parts[0]), true);
+                    await _dbContext.PersonEmails.AddAsync(personEmail);
+                }
+            }
+
+            // Guardar teléfono
+            if (!string.IsNullOrWhiteSpace(request.Phone))
+            {
+                var allCodes = await _dbContext.PhoneCodes.ToListAsync();
+                var phoneCode = allCodes.FirstOrDefault();
+                if (phoneCode is not null)
+                {
+                    var personPhone = new PersonPhone(person.Id, phoneCode.Id, new PhoneNumber(request.Phone), true);
+                    await _dbContext.PersonPhones.AddAsync(personPhone);
+                }
+            }
+
+            // Guardar documento
+            if (request.DocumentTypeId.HasValue && !string.IsNullOrWhiteSpace(request.DocumentNumber))
+            {
+                var personDoc = new PersonDocument(
+                    person.Id,
+                    request.DocumentTypeId.Value,
+                    new DocumentNumber(request.DocumentNumber));
+                await _dbContext.PersonDocuments.AddAsync(personDoc);
+            }
+
             await _dbContext.SaveChangesAsync();
 
             var customer = new Customer(person.Id);
             await _customerRepository.AddAsync(customer);
             await _dbContext.SaveChangesAsync();
 
-            await _dbContext.Entry(customer).Reference(c => c.Person).LoadAsync();
-            return customer.Adapt<CustomerDto>();
+            return await GetByIdAsync(customer.Id) ?? MapToDto(customer);
         }
 
         public async Task<CustomerRegistrationDto> RegisterWithVehicleAsync(RegisterCustomerWithVehicleRequest request)
@@ -130,20 +179,16 @@ namespace Infrastructure.Services
         public async Task<bool> UpdateAsync(int id, UpdateCustomerRequest request)
         {
             var customer = await _customerRepository.GetByIdAsync(id);
-            if (customer is null)
-            {
-                return false;
-            }
+            if (customer is null) return false;
 
-            customer.Person.Update(new PersonFirstName(request.FirstName), new PersonLastName(request.LastName));
+            customer.Person.Update(
+                new PersonFirstName(request.FirstName),
+                new PersonLastName(request.LastName));
+
             if (request.IsActive)
-            {
                 customer.Activate();
-            }
             else
-            {
                 customer.Deactivate();
-            }
 
             _customerRepository.Update(customer);
             await _dbContext.SaveChangesAsync();
@@ -153,10 +198,7 @@ namespace Infrastructure.Services
         public async Task<bool> DeleteAsync(int id)
         {
             var customer = await _customerRepository.GetByIdAsync(id);
-            if (customer is null)
-            {
-                return false;
-            }
+            if (customer is null) return false;
 
             await EnsureCustomerCanBeDeletedAsync(id);
 
@@ -167,119 +209,40 @@ namespace Infrastructure.Services
 
         private async Task EnsureCustomerCanBeDeletedAsync(int customerId)
         {
-            var hasAppointments = await _dbContext.Appointments.AnyAsync(x => x.CustomerId == customerId);
+            var hasAppointments = await _dbContext.Appointments
+                .AnyAsync(x => x.CustomerId == customerId);
+
             if (hasAppointments)
-            {
                 throw new InvalidOperationException(
                     $"Customer {customerId} cannot be deleted because it has appointments associated.");
-            }
 
             var hasServiceOrders = await _dbContext.ServiceOrders.AnyAsync(x =>
                 x.AppointmentId.HasValue &&
-                _dbContext.Appointments.Any(a => a.Id == x.AppointmentId.Value && a.CustomerId == customerId));
+                _dbContext.Appointments.Any(a =>
+                    a.Id == x.AppointmentId.Value &&
+                    a.CustomerId == customerId));
 
             if (hasServiceOrders)
-            {
                 throw new InvalidOperationException(
                     $"Customer {customerId} cannot be deleted because it has service orders associated.");
-            }
         }
 
-        private async Task<EmailDomain> GetOrCreateEmailDomainAsync(string domainValue)
+        private static CustomerDto MapToDto(Customer c) => new()
         {
-            var normalizedDomain = new EmailDomainValue(domainValue);
-            var emailDomain = await _dbContext.EmailDomains
-                .FirstOrDefaultAsync(x => x.Domain == normalizedDomain);
-
-            if (emailDomain is not null)
-            {
-                return emailDomain;
-            }
-
-            emailDomain = new EmailDomain(normalizedDomain);
-            await _dbContext.EmailDomains.AddAsync(emailDomain);
-            await _dbContext.SaveChangesAsync();
-            return emailDomain;
-        }
-
-        private async Task<Vehicle> CreateVehicleAsync(RegisterVehicleRequest request)
-        {
-            if (!await _dbContext.VehicleModels.AnyAsync(x => x.Id == request.ModelId))
-            {
-                throw new ArgumentException($"Vehicle model {request.ModelId} does not exist.");
-            }
-
-            if (request.ColorId.HasValue && !await _dbContext.VehicleColors.AnyAsync(x => x.Id == request.ColorId.Value))
-            {
-                throw new ArgumentException($"Vehicle color {request.ColorId.Value} does not exist.");
-            }
-
-            if (request.FuelTypeId.HasValue && !await _dbContext.FuelTypes.AnyAsync(x => x.Id == request.FuelTypeId.Value))
-            {
-                throw new ArgumentException($"Fuel type {request.FuelTypeId.Value} does not exist.");
-            }
-
-            if (request.TransmissionTypeId.HasValue &&
-                !await _dbContext.TransmissionTypes.AnyAsync(x => x.Id == request.TransmissionTypeId.Value))
-            {
-                throw new ArgumentException($"Transmission type {request.TransmissionTypeId.Value} does not exist.");
-            }
-
-            var normalizedVin = request.Vin.Trim().ToUpperInvariant();
-            if (await _dbContext.Vehicles.AnyAsync(x => x.VIN.Value == normalizedVin))
-            {
-                throw new InvalidOperationException($"Vehicle VIN '{request.Vin}' is already registered.");
-            }
-
-            var vehicle = new Vehicle(
-                request.ModelId,
-                new VinNumber(normalizedVin),
-                new VehicleYear(request.Year),
-                new VehicleMileage(request.Mileage),
-                request.ColorId,
-                request.FuelTypeId,
-                request.TransmissionTypeId,
-                string.IsNullOrWhiteSpace(request.LicensePlate) ? null : new LicensePlate(request.LicensePlate));
-
-            await _dbContext.Vehicles.AddAsync(vehicle);
-            await _dbContext.SaveChangesAsync();
-            return vehicle;
-        }
-
-        private static (string User, string Domain) ParseEmail(string email)
-        {
-            var parts = email
-                .Trim()
-                .ToLowerInvariant()
-                .Split('@', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            if (parts.Length != 2)
-            {
-                throw new ArgumentException("Email format is invalid.");
-            }
-
-            return (parts[0], parts[1]);
-        }
-
-        private static VehicleDto MapVehicleToDto(Vehicle vehicle)
-        {
-            return new VehicleDto
-            {
-                Id = vehicle.Id,
-                ModelId = vehicle.ModelId,
-                ColorId = vehicle.ColorId,
-                FuelTypeId = vehicle.FuelTypeId,
-                TransmissionTypeId = vehicle.TransmissionTypeId,
-                Vin = vehicle.VIN.Value,
-                Year = vehicle.Year.Value,
-                Mileage = vehicle.Mileage.Value,
-                LicensePlate = vehicle.LicensePlate?.Value,
-                ModelName = vehicle.Model?.ModelName.Value ?? string.Empty,
-                BrandName = vehicle.Model?.Brand?.BrandName.Value ?? string.Empty,
-                ColorName = vehicle.Color?.Name.Value,
-                FuelTypeName = vehicle.FuelType?.Name.Value,
-                TransmissionTypeName = vehicle.TransmissionType?.Name.Value
-            };
-        }
+            Id               = c.Id,
+            PersonId         = c.PersonId,
+            IsActive         = c.Status?.Value ?? true,
+            FirstName        = c.Person?.FirstName?.Value ?? string.Empty,
+            LastName         = c.Person?.LastName?.Value  ?? string.Empty,
+            PrimaryEmail = c.Person?.Emails?
+                .FirstOrDefault(e => e.IsPrimary) is { } primaryEmail
+                ? $"{primaryEmail.EmailUser.Value}@{primaryEmail.EmailDomain?.Domain?.Value}"
+                : "—",
+            PrimaryPhone     = c.Person?.Phones?
+                                 .FirstOrDefault(p => p.IsPrimary)?.PhoneNumber?.Value ?? "—",
+            PrimaryDocument  = c.Person?.Documents?
+                                 .FirstOrDefault()?.DocumentNumber?.Value ?? "—",
+            Person           = c.Person?.Adapt<PersonDto>()!
+        };
     }
 }

@@ -22,5 +22,6 @@ namespace Application.Requests.Vehicles
 
         [StringLength(20)]
         public string? LicensePlate { get; init; }
+        public int? CustomerId { get; init; }
     }
 }

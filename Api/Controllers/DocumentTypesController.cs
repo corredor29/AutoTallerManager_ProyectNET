@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Application.Contracts.Services;
 using Application.Requests.DocumentTypes;
 using Api.Security;
@@ -10,10 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = AppRoles.Admin)]
+    [Authorize]
     public sealed class DocumentTypesController : ControllerBase
     {
         private readonly IDocumentTypeService _documentTypeService;
@@ -43,6 +38,7 @@ namespace Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Create([FromBody] CreateDocumentTypeRequest request)
         {
             var documentType = await _documentTypeService.CreateAsync(request);
@@ -50,6 +46,7 @@ namespace Api.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateDocumentTypeRequest request)
         {
             var updated = await _documentTypeService.UpdateAsync(id, request);
@@ -60,6 +57,7 @@ namespace Api.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)
         {
             var removed = await _documentTypeService.DeleteAsync(id);

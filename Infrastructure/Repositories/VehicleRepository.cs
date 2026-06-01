@@ -3,7 +3,6 @@ using Application.Contracts.Repositories;
 using Application.Filters;
 using Domain.Entities.Vehicles;
 using Infrastructure.Context;
-using Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories
@@ -20,35 +19,47 @@ namespace Infrastructure.Repositories
         public async Task<PagedResult<Vehicle>> GetAllPagedAsync(
             PaginationParams pagination, VehicleFilter filter)
         {
-            var query = _dbContext.Vehicles
+            var allVehicles = await _dbContext.Vehicles
                 .Include(v => v.Model)
                     .ThenInclude(m => m.Brand)
                 .Include(v => v.Color)
                 .Include(v => v.FuelType)
                 .Include(v => v.TransmissionType)
-                .AsQueryable();
+                .Include(v => v.Ownerships)
+                    .ThenInclude(o => o.Customer)
+                        .ThenInclude(c => c.Person)
+                .ToListAsync();
 
-            query = query
-                .WhereIf(!string.IsNullOrWhiteSpace(filter.VIN),
-                    v => EF.Functions.ILike(v.VIN.Value, "%" + filter.VIN!.Trim() + "%"))
-                .WhereIf(!string.IsNullOrWhiteSpace(filter.LicensePlate),
-                    v => v.LicensePlate != null &&
-                         EF.Functions.ILike(v.LicensePlate.Value, "%" + filter.LicensePlate!.Trim() + "%"))
-                .WhereIf(filter.BrandId.HasValue, v => v.Model.BrandId == filter.BrandId!.Value)
-                .WhereIf(filter.ModelId.HasValue, v => v.ModelId == filter.ModelId!.Value)
-                .WhereIf(filter.Year.HasValue,    v => v.Year.Value == filter.Year!.Value);
+            var query = allVehicles.AsQueryable();
 
-            var totalCount = await query.CountAsync();
-            var page = pagination.NormalizedPageNumber;
-            var size = pagination.NormalizedPageSize;
+            if (!string.IsNullOrWhiteSpace(filter.VIN))
+                query = query.Where(v => v.VIN.Value
+                    .Contains(filter.VIN.Trim(), StringComparison.OrdinalIgnoreCase));
 
-            var items = await query
+            if (!string.IsNullOrWhiteSpace(filter.LicensePlate))
+                query = query.Where(v => v.LicensePlate != null &&
+                    v.LicensePlate.Value.Contains(filter.LicensePlate.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (filter.BrandId.HasValue)
+                query = query.Where(v => v.Model.BrandId == filter.BrandId.Value);
+
+            if (filter.ModelId.HasValue)
+                query = query.Where(v => v.ModelId == filter.ModelId.Value);
+
+            if (filter.Year.HasValue)
+                query = query.Where(v => v.Year.Value == filter.Year.Value);
+
+            var totalCount = query.Count();
+            var page       = pagination.NormalizedPageNumber;
+            var size       = pagination.NormalizedPageSize;
+
+            var items = query
                 .OrderBy(v => v.Model.Brand.BrandName.Value)
                 .ThenBy(v => v.Model.ModelName.Value)
                 .ThenBy(v => v.VIN.Value)
                 .Skip((page - 1) * size)
                 .Take(size)
-                .ToListAsync();
+                .ToList();
 
             return new PagedResult<Vehicle>
             {
@@ -67,6 +78,9 @@ namespace Infrastructure.Repositories
                 .Include(v => v.Color)
                 .Include(v => v.FuelType)
                 .Include(v => v.TransmissionType)
+                .Include(v => v.Ownerships)
+                    .ThenInclude(o => o.Customer)
+                        .ThenInclude(c => c.Person)
                 .FirstOrDefaultAsync(v => v.Id == id);
         }
 
@@ -78,14 +92,18 @@ namespace Infrastructure.Repositories
                 .Include(v => v.Color)
                 .Include(v => v.FuelType)
                 .Include(v => v.TransmissionType)
+                .Include(v => v.Ownerships)
+                    .ThenInclude(o => o.Customer)
+                        .ThenInclude(c => c.Person)
                 .ToListAsync();
         }
 
         public async Task<bool> ExistsByVinAsync(string vin, int? excludeId = null)
         {
             var normalizedVin = vin.Trim().ToUpperInvariant();
-            return await _dbContext.Vehicles.AnyAsync(v =>
-                v.VIN.Value == normalizedVin &&
+            var all = await _dbContext.Vehicles.ToListAsync();
+            return all.Any(v =>
+                v.VIN.Value.ToUpperInvariant() == normalizedVin &&
                 (!excludeId.HasValue || v.Id != excludeId.Value));
         }
 

@@ -112,11 +112,12 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
 
     public async Task<bool> HasActiveOrderForVehicleAsync(int vehicleId)
     {
-        var activeStatusIds = await _dbContext.OrderStatuses
+        var allStatuses = await _dbContext.OrderStatuses.ToListAsync();
+        var activeStatusIds = allStatuses
             .Where(s => s.Name.Value.ToLower() == "pending" ||
                         s.Name.Value.ToLower() == "in progress")
             .Select(s => s.Id)
-            .ToListAsync();
+            .ToList();
 
         return await _dbContext.ServiceOrders.AnyAsync(x =>
             x.VehicleId == vehicleId &&
