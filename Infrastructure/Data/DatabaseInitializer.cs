@@ -21,6 +21,7 @@ using Domain.Entities.Vehicles;
 using Domain.Entities.Audit;
 using Domain.ValueObject.Vehicles.VehicleBrand;
 using Domain.ValueObject.Vehicles.VehicleColor;
+using Domain.ValueObject.Vehicles.VehicleModel;
 using Domain.ValueObject.Vehicles.FuelType;
 using Domain.ValueObject.Vehicles.TransmissionType;
 using Domain.ValueObject.Persons.DocumentType;
@@ -58,20 +59,16 @@ public class DatabaseInitializer
         await SeedEmailDomainsAsync();
         await SeedPhoneCodesAsync();
         await SeedVehicleBrandsAsync();
+        await SeedVehicleModelsAsync();
         await SeedVehicleColorsAsync();
         await SeedFuelTypesAsync();
         await SeedTransmissionTypesAsync();
         await SeedAuditActionTypesAsync();
-
     }
 
     private async Task SeedAppointmentStatusesAsync()
     {
-        if (await _dbContext.AppointmentStatuses.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.AppointmentStatuses.AnyAsync()) return;
         var statuses = new[]
         {
             new AppointmentStatus(new AppointmentStatusName("Pending")),
@@ -79,18 +76,13 @@ public class DatabaseInitializer
             new AppointmentStatus(new AppointmentStatusName("Completed")),
             new AppointmentStatus(new AppointmentStatusName("Cancelled"))
         };
-
         await _dbContext.AppointmentStatuses.AddRangeAsync(statuses);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedOrderStatusesAsync()
     {
-        if (await _dbContext.OrderStatuses.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.OrderStatuses.AnyAsync()) return;
         var statuses = new[]
         {
             new OrderStatus(new OrderStatusName("Pending")),
@@ -98,54 +90,39 @@ public class DatabaseInitializer
             new OrderStatus(new OrderStatusName("Completed")),
             new OrderStatus(new OrderStatusName("Cancelled"))
         };
-
         await _dbContext.OrderStatuses.AddRangeAsync(statuses);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedServiceTypesAsync()
     {
-        if (await _dbContext.ServiceTypes.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.ServiceTypes.AnyAsync()) return;
         var serviceTypes = new[]
         {
             new ServiceType(new ServiceTypeName("Preventive Maintenance"), new ServiceDuration(4)),
             new ServiceType(new ServiceTypeName("Repair"), new ServiceDuration(8)),
             new ServiceType(new ServiceTypeName("Diagnostics"), new ServiceDuration(2))
         };
-
         await _dbContext.ServiceTypes.AddRangeAsync(serviceTypes);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedQuotationStatusesAsync()
     {
-        if (await _dbContext.QuotationStatuses.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.QuotationStatuses.AnyAsync()) return;
         var quotationStatuses = new[]
         {
             new QuotationStatus(new QuotationStatusName("Pending")),
             new QuotationStatus(new QuotationStatusName("Accepted")),
             new QuotationStatus(new QuotationStatusName("Rejected"))
         };
-
         await _dbContext.QuotationStatuses.AddRangeAsync(quotationStatuses);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedPurchaseOrderStatusesAsync()
     {
-        if (await _dbContext.PurchaseOrderStatuses.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.PurchaseOrderStatuses.AnyAsync()) return;
         var purchaseOrderStatuses = new[]
         {
             new PurchaseOrderStatus(new PurchaseOrderStatusName("Pending")),
@@ -153,18 +130,13 @@ public class DatabaseInitializer
             new PurchaseOrderStatus(new PurchaseOrderStatusName("Received")),
             new PurchaseOrderStatus(new PurchaseOrderStatusName("Cancelled"))
         };
-
         await _dbContext.PurchaseOrderStatuses.AddRangeAsync(purchaseOrderStatuses);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedPaymentMethodsAsync()
     {
-        if (await _dbContext.PaymentMethods.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.PaymentMethods.AnyAsync()) return;
         var paymentMethods = new[]
         {
             new PaymentMethod(new PaymentMethodName("Cash")),
@@ -172,25 +144,19 @@ public class DatabaseInitializer
             new PaymentMethod(new PaymentMethodName("Debit Card")),
             new PaymentMethod(new PaymentMethodName("Bank Transfer"))
         };
-
         await _dbContext.PaymentMethods.AddRangeAsync(paymentMethods);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedRolesAsync()
     {
-        if (await _dbContext.Roles.AnyAsync())
-        {
-            return;
-        }
-
+        if (await _dbContext.Roles.AnyAsync()) return;
         var roles = new[]
         {
             new Role(new RoleName("Admin")),
             new Role(new RoleName("Mechanic")),
             new Role(new RoleName("Receptionist"))
         };
-
         await _dbContext.Roles.AddRangeAsync(roles);
         await _dbContext.SaveChangesAsync();
     }
@@ -233,10 +199,7 @@ public class DatabaseInitializer
     private async Task EnsureDefaultAdminEmailAsync(int personId)
     {
         var hasPrimaryEmail = await _dbContext.PersonEmails.AnyAsync(x => x.PersonId == personId && x.IsPrimary);
-        if (hasPrimaryEmail)
-        {
-            return;
-        }
+        if (hasPrimaryEmail) return;
 
         var emailDomain = await _dbContext.EmailDomains
             .FirstOrDefaultAsync(x => x.Domain == new EmailDomainValue("autotaller.local"));
@@ -249,9 +212,7 @@ public class DatabaseInitializer
         }
 
         var existingAdminEmail = (await _dbContext.PersonEmails
-            .Where(x =>
-                x.PersonId == personId &&
-                x.EmailDomainId == emailDomain.Id)
+            .Where(x => x.PersonId == personId && x.EmailDomainId == emailDomain.Id)
             .ToListAsync())
             .FirstOrDefault(x => x.EmailUser.Value == "admin");
 
@@ -268,18 +229,17 @@ public class DatabaseInitializer
 
         await _dbContext.SaveChangesAsync();
     }
+
     private async Task SeedDocumentTypesAsync()
     {
         if (await _dbContext.DocumentTypes.AnyAsync()) return;
-
         var documentTypes = new[]
         {
-            new DocumentType(new DocumentCode("NID"),  new DocumentTypeName("National Identity Document")),
-            new DocumentType(new DocumentCode("TIN"),  new DocumentTypeName("Tax Identification Number")),
-            new DocumentType(new DocumentCode("FID"),  new DocumentTypeName("Foreign Identity Document")),
-            new DocumentType(new DocumentCode("PAS"),  new DocumentTypeName("Passport"))
+            new DocumentType(new DocumentCode("NID"), new DocumentTypeName("National Identity Document")),
+            new DocumentType(new DocumentCode("TIN"), new DocumentTypeName("Tax Identification Number")),
+            new DocumentType(new DocumentCode("FID"), new DocumentTypeName("Foreign Identity Document")),
+            new DocumentType(new DocumentCode("PAS"), new DocumentTypeName("Passport"))
         };
-
         await _dbContext.DocumentTypes.AddRangeAsync(documentTypes);
         await _dbContext.SaveChangesAsync();
     }
@@ -287,7 +247,6 @@ public class DatabaseInitializer
     private async Task SeedEmailDomainsAsync()
     {
         if (await _dbContext.EmailDomains.AnyAsync()) return;
-
         var domains = new[]
         {
             new EmailDomain(new EmailDomainValue("gmail.com")),
@@ -296,7 +255,6 @@ public class DatabaseInitializer
             new EmailDomain(new EmailDomainValue("yahoo.com")),
             new EmailDomain(new EmailDomainValue("icloud.com"))
         };
-
         await _dbContext.EmailDomains.AddRangeAsync(domains);
         await _dbContext.SaveChangesAsync();
     }
@@ -304,7 +262,6 @@ public class DatabaseInitializer
     private async Task SeedPhoneCodesAsync()
     {
         if (await _dbContext.PhoneCodes.AnyAsync()) return;
-
         var phoneCodes = new[]
         {
             new PhoneCode(new PhoneCodeValue("+57"), new PhoneCodeCountry("Colombia")),
@@ -313,7 +270,6 @@ public class DatabaseInitializer
             new PhoneCode(new PhoneCodeValue("+34"), new PhoneCodeCountry("Spain")),
             new PhoneCode(new PhoneCodeValue("+55"), new PhoneCodeCountry("Brazil"))
         };
-
         await _dbContext.PhoneCodes.AddRangeAsync(phoneCodes);
         await _dbContext.SaveChangesAsync();
     }
@@ -321,7 +277,6 @@ public class DatabaseInitializer
     private async Task SeedVehicleBrandsAsync()
     {
         if (await _dbContext.VehicleBrands.AnyAsync()) return;
-
         var brands = new[]
         {
             new VehicleBrand(new BrandName("Toyota")),
@@ -335,15 +290,125 @@ public class DatabaseInitializer
             new VehicleBrand(new BrandName("Nissan")),
             new VehicleBrand(new BrandName("Honda"))
         };
-
         await _dbContext.VehicleBrands.AddRangeAsync(brands);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedVehicleModelsAsync()
+    {
+        if (await _dbContext.VehicleModels.AnyAsync()) return;
+
+        var brands = await _dbContext.VehicleBrands.ToListAsync();
+        var brandMap = brands.ToDictionary(b => b.BrandName.Value);
+        var models = new List<VehicleModel>();
+
+        if (brandMap.TryGetValue("Toyota", out var toyota))
+            models.AddRange(new[]
+            {
+                new VehicleModel(toyota.Id, new ModelName("Corolla")),
+                new VehicleModel(toyota.Id, new ModelName("Camry")),
+                new VehicleModel(toyota.Id, new ModelName("Hilux")),
+                new VehicleModel(toyota.Id, new ModelName("RAV4")),
+                new VehicleModel(toyota.Id, new ModelName("Yaris"))
+            });
+
+        if (brandMap.TryGetValue("Chevrolet", out var chevrolet))
+            models.AddRange(new[]
+            {
+                new VehicleModel(chevrolet.Id, new ModelName("Spark")),
+                new VehicleModel(chevrolet.Id, new ModelName("Aveo")),
+                new VehicleModel(chevrolet.Id, new ModelName("Cruze")),
+                new VehicleModel(chevrolet.Id, new ModelName("Tracker")),
+                new VehicleModel(chevrolet.Id, new ModelName("Captiva"))
+            });
+
+        if (brandMap.TryGetValue("Ford", out var ford))
+            models.AddRange(new[]
+            {
+                new VehicleModel(ford.Id, new ModelName("Fiesta")),
+                new VehicleModel(ford.Id, new ModelName("Focus")),
+                new VehicleModel(ford.Id, new ModelName("Mustang")),
+                new VehicleModel(ford.Id, new ModelName("Explorer")),
+                new VehicleModel(ford.Id, new ModelName("Escape"))
+            });
+
+        if (brandMap.TryGetValue("Mazda", out var mazda))
+            models.AddRange(new[]
+            {
+                new VehicleModel(mazda.Id, new ModelName("Mazda2")),
+                new VehicleModel(mazda.Id, new ModelName("Mazda3")),
+                new VehicleModel(mazda.Id, new ModelName("Mazda6")),
+                new VehicleModel(mazda.Id, new ModelName("CX-5")),
+                new VehicleModel(mazda.Id, new ModelName("CX-30"))
+            });
+
+        if (brandMap.TryGetValue("Renault", out var renault))
+            models.AddRange(new[]
+            {
+                new VehicleModel(renault.Id, new ModelName("Sandero")),
+                new VehicleModel(renault.Id, new ModelName("Duster")),
+                new VehicleModel(renault.Id, new ModelName("Logan")),
+                new VehicleModel(renault.Id, new ModelName("Kwid")),
+                new VehicleModel(renault.Id, new ModelName("Captur"))
+            });
+
+        if (brandMap.TryGetValue("Kia", out var kia))
+            models.AddRange(new[]
+            {
+                new VehicleModel(kia.Id, new ModelName("Picanto")),
+                new VehicleModel(kia.Id, new ModelName("Rio")),
+                new VehicleModel(kia.Id, new ModelName("Cerato")),
+                new VehicleModel(kia.Id, new ModelName("Sportage")),
+                new VehicleModel(kia.Id, new ModelName("Sorento"))
+            });
+
+        if (brandMap.TryGetValue("Hyundai", out var hyundai))
+            models.AddRange(new[]
+            {
+                new VehicleModel(hyundai.Id, new ModelName("i10")),
+                new VehicleModel(hyundai.Id, new ModelName("i20")),
+                new VehicleModel(hyundai.Id, new ModelName("Elantra")),
+                new VehicleModel(hyundai.Id, new ModelName("Tucson")),
+                new VehicleModel(hyundai.Id, new ModelName("Santa Fe"))
+            });
+
+        if (brandMap.TryGetValue("Volkswagen", out var vw))
+            models.AddRange(new[]
+            {
+                new VehicleModel(vw.Id, new ModelName("Polo")),
+                new VehicleModel(vw.Id, new ModelName("Golf")),
+                new VehicleModel(vw.Id, new ModelName("Jetta")),
+                new VehicleModel(vw.Id, new ModelName("Tiguan")),
+                new VehicleModel(vw.Id, new ModelName("Passat"))
+            });
+
+        if (brandMap.TryGetValue("Nissan", out var nissan))
+            models.AddRange(new[]
+            {
+                new VehicleModel(nissan.Id, new ModelName("March")),
+                new VehicleModel(nissan.Id, new ModelName("Sentra")),
+                new VehicleModel(nissan.Id, new ModelName("Versa")),
+                new VehicleModel(nissan.Id, new ModelName("X-Trail")),
+                new VehicleModel(nissan.Id, new ModelName("Frontier"))
+            });
+
+        if (brandMap.TryGetValue("Honda", out var honda))
+            models.AddRange(new[]
+            {
+                new VehicleModel(honda.Id, new ModelName("Fit")),
+                new VehicleModel(honda.Id, new ModelName("Civic")),
+                new VehicleModel(honda.Id, new ModelName("Accord")),
+                new VehicleModel(honda.Id, new ModelName("CR-V")),
+                new VehicleModel(honda.Id, new ModelName("HR-V"))
+            });
+
+        await _dbContext.VehicleModels.AddRangeAsync(models);
         await _dbContext.SaveChangesAsync();
     }
 
     private async Task SeedVehicleColorsAsync()
     {
         if (await _dbContext.VehicleColors.AnyAsync()) return;
-
         var colors = new[]
         {
             new VehicleColor(new ColorName("White")),
@@ -355,7 +420,6 @@ public class DatabaseInitializer
             new VehicleColor(new ColorName("Green")),
             new VehicleColor(new ColorName("Yellow"))
         };
-
         await _dbContext.VehicleColors.AddRangeAsync(colors);
         await _dbContext.SaveChangesAsync();
     }
@@ -363,7 +427,6 @@ public class DatabaseInitializer
     private async Task SeedFuelTypesAsync()
     {
         if (await _dbContext.FuelTypes.AnyAsync()) return;
-
         var fuelTypes = new[]
         {
             new FuelType(new FuelTypeName("Gasoline")),
@@ -372,7 +435,6 @@ public class DatabaseInitializer
             new FuelType(new FuelTypeName("Hybrid")),
             new FuelType(new FuelTypeName("Natural Gas"))
         };
-
         await _dbContext.FuelTypes.AddRangeAsync(fuelTypes);
         await _dbContext.SaveChangesAsync();
     }
@@ -380,7 +442,6 @@ public class DatabaseInitializer
     private async Task SeedTransmissionTypesAsync()
     {
         if (await _dbContext.TransmissionTypes.AnyAsync()) return;
-
         var transmissionTypes = new[]
         {
             new TransmissionType(new TransmissionTypeName("Manual")),
@@ -388,7 +449,6 @@ public class DatabaseInitializer
             new TransmissionType(new TransmissionTypeName("Semi-Automatic")),
             new TransmissionType(new TransmissionTypeName("CVT"))
         };
-
         await _dbContext.TransmissionTypes.AddRangeAsync(transmissionTypes);
         await _dbContext.SaveChangesAsync();
     }
@@ -396,7 +456,6 @@ public class DatabaseInitializer
     private async Task SeedAuditActionTypesAsync()
     {
         if (await _dbContext.AuditActionTypes.AnyAsync()) return;
-
         var actionTypes = new[]
         {
             new AuditActionType(new AuditActionTypeName("Create")),
@@ -405,7 +464,6 @@ public class DatabaseInitializer
             new AuditActionType(new AuditActionTypeName("Login")),
             new AuditActionType(new AuditActionTypeName("Logout"))
         };
-
         await _dbContext.AuditActionTypes.AddRangeAsync(actionTypes);
         await _dbContext.SaveChangesAsync();
     }

@@ -3,7 +3,6 @@ using Application.Contracts.Repositories;
 using Application.Filters;
 using Domain.Entities.Customers;
 using Infrastructure.Context;
-using Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories
@@ -20,35 +19,47 @@ namespace Infrastructure.Repositories
         public async Task<PagedResult<Customer>> GetAllPagedAsync(
             PaginationParams pagination, CustomerFilter filter)
         {
-            var query = _dbContext.Customers
+            var allCustomers = await _dbContext.Customers
                 .Include(c => c.Person)
                     .ThenInclude(p => p.Documents)
-                .AsQueryable();
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Emails)
+                        .ThenInclude(e => e.EmailDomain)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Phones)
+                .ToListAsync();
 
-            query = query
-                .WhereIf(!string.IsNullOrWhiteSpace(filter.FirstName),
-                    c => EF.Functions.ILike(c.Person.FirstName.Value, "%" + filter.FirstName!.Trim() + "%"))
-                .WhereIf(!string.IsNullOrWhiteSpace(filter.LastName),
-                    c => EF.Functions.ILike(c.Person.LastName.Value, "%" + filter.LastName!.Trim() + "%"))
-                .WhereIf(!string.IsNullOrWhiteSpace(filter.DocumentNumber),
-                    c => c.Person.Documents.Any(d =>
-                        EF.Functions.ILike(d.DocumentNumber.Value, "%" + filter.DocumentNumber!.Trim() + "%")))
-                .WhereIf(filter.IsActive.HasValue, c => c.Status.Value == filter.IsActive!.Value);
+            var query = allCustomers.AsQueryable();
 
-            var totalCount = await query.CountAsync();
-            var page = pagination.NormalizedPageNumber;
-            var size = pagination.NormalizedPageSize;
+            if (!string.IsNullOrWhiteSpace(filter.FirstName))
+                query = query.Where(c => c.Person.FirstName.Value
+                    .Contains(filter.FirstName.Trim(), StringComparison.OrdinalIgnoreCase));
 
-            var items = await query
+            if (!string.IsNullOrWhiteSpace(filter.LastName))
+                query = query.Where(c => c.Person.LastName.Value
+                    .Contains(filter.LastName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(filter.DocumentNumber))
+                query = query.Where(c => c.Person.Documents.Any(d =>
+                    d.DocumentNumber.Value.Contains(filter.DocumentNumber.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+            if (filter.IsActive.HasValue)
+                query = query.Where(c => c.Status.Value == filter.IsActive.Value);
+
+            var totalCount = query.Count();
+            var page       = pagination.NormalizedPageNumber;
+            var size       = pagination.NormalizedPageSize;
+
+            var items = query
                 .OrderBy(c => c.Person.LastName.Value)
                 .ThenBy(c => c.Person.FirstName.Value)
                 .Skip((page - 1) * size)
                 .Take(size)
-                .ToListAsync();
+                .ToList();
 
             return new PagedResult<Customer>
             {
-                Items     = items,
+                Items      = items,
                 PageNumber = page,
                 PageSize   = size,
                 TotalCount = totalCount
@@ -59,6 +70,12 @@ namespace Infrastructure.Repositories
         {
             return await _dbContext.Customers
                 .Include(c => c.Person)
+                    .ThenInclude(p => p.Documents)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Emails)
+                        .ThenInclude(e => e.EmailDomain)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Phones)
                 .FirstOrDefaultAsync(c => c.Id == id);
         }
 
@@ -66,6 +83,12 @@ namespace Infrastructure.Repositories
         {
             return await _dbContext.Customers
                 .Include(c => c.Person)
+                    .ThenInclude(p => p.Documents)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Emails)
+                        .ThenInclude(e => e.EmailDomain)
+                .Include(c => c.Person)
+                    .ThenInclude(p => p.Phones)
                 .ToListAsync();
         }
 

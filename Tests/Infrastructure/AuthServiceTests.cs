@@ -1,7 +1,10 @@
 using Application.Requests.Auth;
 using AutoTallerManager.Tests.Fakes;
 using AutoTallerManager.Tests.Helpers;
+using Infrastructure.Context;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace AutoTallerManager.Tests.Infrastructure;
@@ -65,14 +68,23 @@ public sealed class AuthServiceTests
 
     private static AuthService CreateService(FakeUserRepository repository)
     {
-        var options = Options.Create(new JwtOptions
+        var jwtOptions = Options.Create(new JwtOptions
         {
-            Issuer = "tests",
-            Audience = "tests",
-            Key = "Tests-Super-Secret-Key-For-Jwt-Generation-2026",
+            Issuer            = "tests",
+            Audience          = "tests",
+            Key               = "Tests-Super-Secret-Key-For-Jwt-Generation-2026",
             ExpirationMinutes = 60
         });
 
-        return new AuthService(repository, options);
+        var dbContextOptions = new DbContextOptionsBuilder<AutoTallerDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        var dbContext = new AutoTallerDbContext(
+            dbContextOptions,
+            new HttpContextAccessor()
+        );
+
+        return new AuthService(repository, jwtOptions, dbContext);
     }
 }

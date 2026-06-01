@@ -19,7 +19,7 @@ namespace Infrastructure.Services
         public VehicleService(IVehicleRepository vehicleRepository, AutoTallerDbContext dbContext)
         {
             _vehicleRepository = vehicleRepository;
-            _dbContext = dbContext;
+            _dbContext         = dbContext;
         }
 
         public async Task<PagedResult<VehicleDto>> GetAllPagedAsync(
@@ -43,15 +43,11 @@ namespace Infrastructure.Services
 
         public async Task<VehicleDto> CreateAsync(CreateVehicleRequest request)
         {
-            if (!await _dbContext.VehicleModels.AnyAsync(model => model.Id == request.ModelId))
-            {
+            if (!await _dbContext.VehicleModels.AnyAsync(m => m.Id == request.ModelId))
                 throw new ArgumentException($"Vehicle model {request.ModelId} does not exist.");
-            }
 
             if (await _vehicleRepository.ExistsByVinAsync(request.Vin))
-            {
                 throw new InvalidOperationException($"Vehicle VIN '{request.Vin}' is already registered.");
-            }
 
             var vehicle = new Vehicle(
                 request.ModelId,
@@ -61,15 +57,32 @@ namespace Infrastructure.Services
                 request.ColorId,
                 request.FuelTypeId,
                 request.TransmissionTypeId,
-                string.IsNullOrWhiteSpace(request.LicensePlate) ? null : new LicensePlate(request.LicensePlate));
+                string.IsNullOrWhiteSpace(request.LicensePlate)
+                    ? null
+                    : new LicensePlate(request.LicensePlate));
 
             await _vehicleRepository.AddAsync(vehicle);
             await _dbContext.SaveChangesAsync();
+
+            if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
+            {
+                var ownership = new VehicleOwnershipHistory(
+                    vehicle.Id,
+                    request.CustomerId.Value,
+                    new Domain.ValueObject.Vehicles.VehicleOwnershipHistory.DateRange(
+                        DateOnly.FromDateTime(DateTime.UtcNow), null));
+                await _dbContext.VehicleOwnershipHistories.AddAsync(ownership);
+                await _dbContext.SaveChangesAsync();
+            }
+
             await _dbContext.Entry(vehicle).Reference(v => v.Model).LoadAsync();
             await _dbContext.Entry(vehicle.Model).Reference(m => m.Brand).LoadAsync();
             await _dbContext.Entry(vehicle).Reference(v => v.Color).LoadAsync();
             await _dbContext.Entry(vehicle).Reference(v => v.FuelType).LoadAsync();
             await _dbContext.Entry(vehicle).Reference(v => v.TransmissionType).LoadAsync();
+            await _dbContext.Entry(vehicle).Collection(v => v.Ownerships).Query()
+                .Include(o => o.Customer).ThenInclude(c => c.Person)
+                .LoadAsync();
 
             return MapToDto(vehicle);
         }
@@ -77,10 +90,7 @@ namespace Infrastructure.Services
         public async Task<bool> UpdateAsync(int id, UpdateVehicleRequest request)
         {
             var vehicle = await _vehicleRepository.GetByIdAsync(id);
-            if (vehicle is null)
-            {
-                return false;
-            }
+            if (vehicle is null) return false;
 
             vehicle.Update(
                 new VehicleYear(request.Year),
@@ -88,7 +98,9 @@ namespace Infrastructure.Services
                 request.ColorId,
                 request.FuelTypeId,
                 request.TransmissionTypeId,
-                string.IsNullOrWhiteSpace(request.LicensePlate) ? null : new LicensePlate(request.LicensePlate));
+                string.IsNullOrWhiteSpace(request.LicensePlate)
+                    ? null
+                    : new LicensePlate(request.LicensePlate));
 
             _vehicleRepository.Update(vehicle);
             await _dbContext.SaveChangesAsync();
@@ -98,10 +110,7 @@ namespace Infrastructure.Services
         public async Task<bool> DeleteAsync(int id)
         {
             var vehicle = await _vehicleRepository.GetByIdAsync(id);
-            if (vehicle is null)
-            {
-                return false;
-            }
+            if (vehicle is null) return false;
 
             await EnsureVehicleCanBeDeletedAsync(id);
 
@@ -112,39 +121,45 @@ namespace Infrastructure.Services
 
         private async Task EnsureVehicleCanBeDeletedAsync(int vehicleId)
         {
-            var hasServiceOrders = await _dbContext.ServiceOrders.AnyAsync(x => x.VehicleId == vehicleId);
+            var hasServiceOrders = await _dbContext.ServiceOrders
+                .AnyAsync(x => x.VehicleId == vehicleId);
             if (hasServiceOrders)
-            {
                 throw new InvalidOperationException(
                     $"Vehicle {vehicleId} cannot be deleted because it has service orders associated.");
-            }
 
-            var hasAppointments = await _dbContext.Appointments.AnyAsync(x => x.VehicleId == vehicleId);
+            var hasAppointments = await _dbContext.Appointments
+                .AnyAsync(x => x.VehicleId == vehicleId);
             if (hasAppointments)
-            {
                 throw new InvalidOperationException(
                     $"Vehicle {vehicleId} cannot be deleted because it has appointments associated.");
-            }
         }
 
         private static VehicleDto MapToDto(Vehicle vehicle)
         {
+            var currentOwner = vehicle.Ownerships?
+                .FirstOrDefault(o => o.DateRange.EndDate == null);
+
+            var ownerName = currentOwner?.Customer?.Person is not null
+                ? $"{currentOwner.Customer.Person.FirstName.Value} {currentOwner.Customer.Person.LastName.Value}".Trim()
+                : null;
+
             return new VehicleDto
             {
-                Id = vehicle.Id,
-                ModelId = vehicle.ModelId,
-                ColorId = vehicle.ColorId,
-                FuelTypeId = vehicle.FuelTypeId,
-                TransmissionTypeId = vehicle.TransmissionTypeId,
-                Vin = vehicle.VIN.Value,
-                Year = vehicle.Year.Value,
-                Mileage = vehicle.Mileage.Value,
-                LicensePlate = vehicle.LicensePlate?.Value,
-                ModelName = vehicle.Model?.ModelName.Value ?? string.Empty,
-                BrandName = vehicle.Model?.Brand?.BrandName.Value ?? string.Empty,
-                ColorName = vehicle.Color?.Name.Value,
-                FuelTypeName = vehicle.FuelType?.Name.Value,
+                Id                   = vehicle.Id,
+                ModelId              = vehicle.ModelId,
+                ColorId              = vehicle.ColorId,
+                FuelTypeId           = vehicle.FuelTypeId,
+                TransmissionTypeId   = vehicle.TransmissionTypeId,
+                Vin                  = vehicle.VIN.Value,
+                Year                 = vehicle.Year.Value,
+                Mileage              = vehicle.Mileage.Value,
+                LicensePlate         = vehicle.LicensePlate?.Value,
+                ModelName            = vehicle.Model?.ModelName.Value        ?? string.Empty,
+                BrandName            = vehicle.Model?.Brand?.BrandName.Value ?? string.Empty,
+                ColorName            = vehicle.Color?.Name.Value,
+                FuelTypeName         = vehicle.FuelType?.Name.Value,
                 TransmissionTypeName = vehicle.TransmissionType?.Name.Value,
+                CurrentOwnerName     = ownerName
             };
         }
     }

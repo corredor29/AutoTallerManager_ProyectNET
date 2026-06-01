@@ -13,16 +13,16 @@ namespace Infrastructure.Services;
 
 public sealed class ServiceOrderService : IServiceOrderService
 {
-    private static readonly string[] ClosingStatuses = ["completed", "cancelled", "canceled"];
+    private static readonly string[] ClosingStatuses   = ["completed", "cancelled", "canceled"];
     private static readonly string[] CancelledStatuses = ["cancelled", "canceled"];
 
     private readonly IServiceOrderRepository _serviceOrderRepository;
-    private readonly AutoTallerDbContext _dbContext;
+    private readonly AutoTallerDbContext     _dbContext;
 
     public ServiceOrderService(IServiceOrderRepository serviceOrderRepository, AutoTallerDbContext dbContext)
     {
         _serviceOrderRepository = serviceOrderRepository;
-        _dbContext = dbContext;
+        _dbContext              = dbContext;
     }
 
     public async Task<PagedResult<ServiceOrderDto>> GetAllPagedAsync(
@@ -54,15 +54,13 @@ public sealed class ServiceOrderService : IServiceOrderService
             request.AppointmentId);
 
         if (await _serviceOrderRepository.HasActiveOrderForVehicleAsync(request.VehicleId))
-        {
             throw new InvalidOperationException(
                 $"Vehicle {request.VehicleId} already has an active service order (Pending or In Progress).");
-        }
 
         var estimatedDeliveryAt = request.EstimatedDeliveryAt;
         if (!estimatedDeliveryAt.HasValue)
         {
-            var serviceType = await _dbContext.ServiceTypes.FindAsync(request.ServiceTypeId);
+            var serviceType   = await _dbContext.ServiceTypes.FindAsync(request.ServiceTypeId);
             var durationHours = serviceType?.EstimatedDuration.Value ?? 2;
             estimatedDeliveryAt = DateTime.UtcNow.AddHours(durationHours);
         }
@@ -78,9 +76,7 @@ public sealed class ServiceOrderService : IServiceOrderService
             estimatedDeliveryAt);
 
         if (await ShouldCloseOrderAsync(request.OrderStatusId))
-        {
             order.Close();
-        }
 
         await _serviceOrderRepository.AddAsync(order);
         await _dbContext.SaveChangesAsync();
@@ -94,10 +90,7 @@ public sealed class ServiceOrderService : IServiceOrderService
     public async Task<bool> UpdateAsync(int id, UpdateServiceOrderRequest request)
     {
         var order = await _serviceOrderRepository.GetByIdAsync(id);
-        if (order is null)
-        {
-            return false;
-        }
+        if (order is null) return false;
 
         EnsureOrderIsOpen(order);
 
@@ -114,29 +107,20 @@ public sealed class ServiceOrderService : IServiceOrderService
     public async Task<bool> ChangeStatusAsync(int id, ChangeServiceOrderStatusRequest request)
     {
         var order = await _serviceOrderRepository.GetByIdAsync(id);
-        if (order is null)
-        {
-            return false;
-        }
+        if (order is null) return false;
 
         EnsureOrderIsOpen(order);
 
         if (!await _dbContext.OrderStatuses.AnyAsync(x => x.Id == request.OrderStatusId))
-        {
             throw new ArgumentException($"Order status {request.OrderStatusId} does not exist.");
-        }
 
         if (await ShouldReleaseReservedPartsAsync(request.OrderStatusId))
-        {
             await ReleaseReservedPartsAsync(order.Id);
-        }
 
         order.ChangeStatus(request.OrderStatusId);
 
         if (await ShouldCloseOrderAsync(request.OrderStatusId) && order.ClosedAt is null)
-        {
             order.Close();
-        }
 
         _serviceOrderRepository.Update(order);
         await _dbContext.SaveChangesAsync();
@@ -146,10 +130,7 @@ public sealed class ServiceOrderService : IServiceOrderService
     public async Task<bool> DeleteAsync(int id)
     {
         var order = await _serviceOrderRepository.GetByIdAsync(id);
-        if (order is null)
-        {
-            return false;
-        }
+        if (order is null) return false;
 
         await ReleaseReservedPartsAsync(order.Id);
 
@@ -159,56 +140,38 @@ public sealed class ServiceOrderService : IServiceOrderService
     }
 
     private async Task EnsureRelatedEntitiesExistAsync(
-        int vehicleId,
-        int serviceTypeId,
-        int mechanicId,
-        int orderStatusId,
-        int? appointmentId)
+        int vehicleId, int serviceTypeId, int mechanicId,
+        int orderStatusId, int? appointmentId)
     {
         if (!await _dbContext.Vehicles.AnyAsync(x => x.Id == vehicleId))
-        {
             throw new ArgumentException($"Vehicle {vehicleId} does not exist.");
-        }
 
         if (!await _dbContext.ServiceTypes.AnyAsync(x => x.Id == serviceTypeId))
-        {
             throw new ArgumentException($"Service type {serviceTypeId} does not exist.");
-        }
 
         if (!await _dbContext.Users.AnyAsync(x => x.Id == mechanicId && x.IsActive))
-        {
             throw new ArgumentException($"Mechanic user {mechanicId} does not exist or is inactive.");
-        }
 
         if (!await _dbContext.OrderStatuses.AnyAsync(x => x.Id == orderStatusId))
-        {
             throw new ArgumentException($"Order status {orderStatusId} does not exist.");
-        }
 
         if (appointmentId.HasValue &&
             !await _dbContext.Appointments.AnyAsync(x => x.Id == appointmentId.Value))
-        {
             throw new ArgumentException($"Appointment {appointmentId.Value} does not exist.");
-        }
     }
 
+    // ── Fix: ToListAsync + filtro en memoria ───────
     private async Task<bool> ShouldCloseOrderAsync(int orderStatusId)
     {
-        var statusName = await _dbContext.OrderStatuses
-            .Where(x => x.Id == orderStatusId)
-            .Select(x => x.Name.Value.ToLower())
-            .FirstOrDefaultAsync();
-
+        var all        = await _dbContext.OrderStatuses.ToListAsync();
+        var statusName = all.FirstOrDefault(x => x.Id == orderStatusId)?.Name.Value.ToLower();
         return statusName is not null && ClosingStatuses.Contains(statusName);
     }
 
     private async Task<bool> ShouldReleaseReservedPartsAsync(int orderStatusId)
     {
-        var statusName = await _dbContext.OrderStatuses
-            .Where(x => x.Id == orderStatusId)
-            .Select(x => x.Name.Value.ToLower())
-            .FirstOrDefaultAsync();
-
+        var all        = await _dbContext.OrderStatuses.ToListAsync();
+        var statusName = all.FirstOrDefault(x => x.Id == orderStatusId)?.Name.Value.ToLower();
         return statusName is not null && CancelledStatuses.Contains(statusName);
     }
 
@@ -219,15 +182,11 @@ public sealed class ServiceOrderService : IServiceOrderService
             .Where(x => x.ServiceOrderId == serviceOrderId)
             .ToListAsync();
 
-        if (reservedParts.Count == 0)
-        {
-            return;
-        }
+        if (reservedParts.Count == 0) return;
 
         foreach (var reservedPart in reservedParts)
-        {
-            reservedPart.Part.AddStock(new Domain.ValueObject.Parts.Part.PartStock(reservedPart.Quantity.Value));
-        }
+            reservedPart.Part.AddStock(
+                new Domain.ValueObject.Parts.Part.PartStock(reservedPart.Quantity.Value));
 
         _dbContext.ServiceOrderParts.RemoveRange(reservedParts);
     }
@@ -235,9 +194,7 @@ public sealed class ServiceOrderService : IServiceOrderService
     private static void EnsureOrderIsOpen(ServiceOrder order)
     {
         if (order.ClosedAt is not null)
-        {
             throw new InvalidOperationException($"Service order {order.Id} is already closed.");
-        }
     }
 
     private static ServiceOrderDto MapToDto(ServiceOrder order)
@@ -252,22 +209,22 @@ public sealed class ServiceOrderService : IServiceOrderService
 
         return new ServiceOrderDto
         {
-            Id = order.Id,
-            VehicleId = order.VehicleId,
-            VehicleVin = order.Vehicle?.VIN.Value ?? string.Empty,
-            VehicleDisplayName = vehicleDisplayName,
-            ServiceTypeId = order.ServiceTypeId,
-            ServiceTypeName = order.ServiceType?.Name.Value ?? string.Empty,
-            MechanicId = order.MechanicId,
-            MechanicName = mechanicFullName,
-            OrderStatusId = order.OrderStatusId,
-            OrderStatusName = order.OrderStatus?.Name.Value ?? string.Empty,
-            AppointmentId = order.AppointmentId,
-            CreatedAt = order.CreatedAt,
+            Id                  = order.Id,
+            VehicleId           = order.VehicleId,
+            VehicleVin          = order.Vehicle?.VIN.Value          ?? string.Empty,
+            VehicleDisplayName  = vehicleDisplayName,
+            ServiceTypeId       = order.ServiceTypeId,
+            ServiceTypeName     = order.ServiceType?.Name.Value      ?? string.Empty,
+            MechanicId          = order.MechanicId,
+            MechanicName        = mechanicFullName,
+            OrderStatusId       = order.OrderStatusId,
+            OrderStatusName     = order.OrderStatus?.Name.Value      ?? string.Empty,
+            AppointmentId       = order.AppointmentId,
+            CreatedAt           = order.CreatedAt,
             EstimatedDeliveryAt = order.EstimatedDeliveryAt,
-            ClosedAt = order.ClosedAt,
-            WorkPerformed = order.WorkPerformed.Value,
-            Notes = order.Notes.Value
+            ClosedAt            = order.ClosedAt,
+            WorkPerformed       = order.WorkPerformed.Value,
+            Notes               = order.Notes.Value
         };
     }
 }

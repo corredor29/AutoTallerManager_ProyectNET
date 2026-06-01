@@ -5,13 +5,13 @@ using Api.RateLimiting;
 using Api.Responses;
 using Infrastructure;
 using Infrastructure.Data;
+using Infrastructure.Services;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
-using Infrastructure.Services;
+using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
@@ -49,9 +49,17 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
         return new BadRequestObjectResult(response);
     };
 });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title   = "AutoTallerManager API",
+        Version = "v1",
+        Description = "Sistema de Gestión de Taller Automotriz"
+    });
+
     var securityScheme = new OpenApiSecurityScheme
     {
         Name         = "Authorization",
@@ -59,16 +67,24 @@ builder.Services.AddSwaggerGen(options =>
         Scheme       = "bearer",
         BearerFormat = "JWT",
         In           = ParameterLocation.Header,
-        Description  = "Enter a valid JWT token."
+        Description  = "Enter a valid JWT token (without 'Bearer' prefix)."
     };
 
     options.AddSecurityDefinition("Bearer", securityScheme);
 
-    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+    // ← Fix: versión clásica compatible con .NET 10
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecuritySchemeReference("Bearer", null, null),
-            []
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id   = "Bearer"
+                }
+            },
+            Array.Empty<string>()
         }
     });
 });
@@ -110,11 +126,11 @@ builder.Services.AddRateLimiter(options =>
 
         var response = new ApiErrorResponse
         {
-            Success = false,
+            Success    = false,
             StatusCode = StatusCodes.Status429TooManyRequests,
-            Title = "Too many requests",
-            Detail = "The rate limit for this endpoint has been exceeded. Please try again later.",
-            TraceId = context.HttpContext.TraceIdentifier
+            Title      = "Too many requests",
+            Detail     = "The rate limit for this endpoint has been exceeded. Please try again later.",
+            TraceId    = context.HttpContext.TraceIdentifier
         };
 
         await context.HttpContext.Response.WriteAsync(
@@ -127,11 +143,11 @@ builder.Services.AddRateLimiter(options =>
             "service-orders",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = rateLimitOptions.ServiceOrders.PermitLimit,
-                Window = TimeSpan.FromMinutes(rateLimitOptions.ServiceOrders.WindowMinutes),
+                PermitLimit          = rateLimitOptions.ServiceOrders.PermitLimit,
+                Window               = TimeSpan.FromMinutes(rateLimitOptions.ServiceOrders.WindowMinutes),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = rateLimitOptions.ServiceOrders.QueueLimit,
-                AutoReplenishment = true
+                QueueLimit           = rateLimitOptions.ServiceOrders.QueueLimit,
+                AutoReplenishment    = true
             }));
 
     options.AddPolicy("parts", _ =>
@@ -139,13 +155,14 @@ builder.Services.AddRateLimiter(options =>
             "parts",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = rateLimitOptions.Parts.PermitLimit,
-                Window = TimeSpan.FromMinutes(rateLimitOptions.Parts.WindowMinutes),
+                PermitLimit          = rateLimitOptions.Parts.PermitLimit,
+                Window               = TimeSpan.FromMinutes(rateLimitOptions.Parts.WindowMinutes),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = rateLimitOptions.Parts.QueueLimit,
-                AutoReplenishment = true
+                QueueLimit           = rateLimitOptions.Parts.QueueLimit,
+                AutoReplenishment    = true
             }));
 });
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFront", policy =>
@@ -161,6 +178,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -174,7 +192,12 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "AutoTallerManager v1");
+        options.DisplayRequestDuration();
+        options.EnablePersistAuthorization();
+    });
 }
 
 app.UseMiddleware<ApiExceptionMiddleware>();

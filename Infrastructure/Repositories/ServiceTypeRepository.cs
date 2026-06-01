@@ -21,9 +21,8 @@ public sealed class ServiceTypeRepository : IServiceTypeRepository
 
     public async Task<IEnumerable<ServiceType>> GetAllAsync()
     {
-        return await _dbContext.ServiceTypes
-            .OrderBy(x => x.Name.Value)
-            .ToListAsync();
+        var all = await _dbContext.ServiceTypes.ToListAsync();
+        return all.OrderBy(x => x.Name.Value).ToList();
     }
 
     public async Task AddAsync(ServiceType serviceType)
