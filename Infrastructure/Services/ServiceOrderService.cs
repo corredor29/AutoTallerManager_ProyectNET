@@ -15,6 +15,7 @@ public sealed class ServiceOrderService : IServiceOrderService
 {
     private static readonly string[] ClosingStatuses   = ["completed", "cancelled", "canceled"];
     private static readonly string[] CancelledStatuses = ["cancelled", "canceled"];
+    private static readonly string[] ActiveAppointmentStatuses = ["pending", "confirmed"];
 
     private readonly IServiceOrderRepository _serviceOrderRepository;
     private readonly AutoTallerDbContext     _dbContext;
@@ -65,6 +66,12 @@ public sealed class ServiceOrderService : IServiceOrderService
             estimatedDeliveryAt = DateTime.UtcNow.AddHours(durationHours);
         }
 
+        await EnsureMechanicAvailabilityAsync(
+            request.MechanicId,
+            DateTime.UtcNow,
+            estimatedDeliveryAt.Value,
+            request.AppointmentId);
+
         var order = new ServiceOrder(
             request.VehicleId,
             request.ServiceTypeId,
@@ -93,6 +100,13 @@ public sealed class ServiceOrderService : IServiceOrderService
         if (order is null) return false;
 
         EnsureOrderIsOpen(order);
+
+        await EnsureMechanicAvailabilityAsync(
+            order.MechanicId,
+            order.CreatedAt,
+            request.EstimatedDeliveryAt ?? order.EstimatedDeliveryAt ?? order.CreatedAt.AddHours(1),
+            order.AppointmentId,
+            order.Id);
 
         order.Update(
             new WorkDescription(request.WorkPerformed),
@@ -189,6 +203,46 @@ public sealed class ServiceOrderService : IServiceOrderService
                 new Domain.ValueObject.Parts.Part.PartStock(reservedPart.Quantity.Value));
 
         _dbContext.ServiceOrderParts.RemoveRange(reservedParts);
+    }
+
+    private async Task EnsureMechanicAvailabilityAsync(
+        int mechanicId,
+        DateTime startAt,
+        DateTime endAt,
+        int? appointmentId = null,
+        int? excludeServiceOrderId = null)
+    {
+        if (endAt <= startAt)
+        {
+            throw new ArgumentException("Estimated delivery date must be after the service order start date.");
+        }
+
+        var hasConflictingServiceOrder = await _dbContext.ServiceOrders
+            .Where(x => x.MechanicId == mechanicId && x.ClosedAt == null)
+            .Where(x => !excludeServiceOrderId.HasValue || x.Id != excludeServiceOrderId.Value)
+            .AnyAsync(x =>
+                x.CreatedAt < endAt &&
+                (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1)) > startAt);
+
+        if (hasConflictingServiceOrder)
+        {
+            throw new InvalidOperationException(
+                $"Mechanic {mechanicId} already has another active service order in that time range.");
+        }
+
+        var hasConflictingAppointment = await _dbContext.Appointments
+            .Where(x => x.AssignedUserId == mechanicId)
+            .Where(x => !appointmentId.HasValue || x.Id != appointmentId.Value)
+            .Where(x => ActiveAppointmentStatuses.Contains(x.AppointmentStatus.Name.Value.ToLower()))
+            .AnyAsync(x =>
+                x.AppointmentDate.Value < endAt &&
+                x.AppointmentDate.Value.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1) > startAt);
+
+        if (hasConflictingAppointment)
+        {
+            throw new InvalidOperationException(
+                $"Mechanic {mechanicId} already has an appointment scheduled in that time range.");
+        }
     }
 
     private static void EnsureOrderIsOpen(ServiceOrder order)

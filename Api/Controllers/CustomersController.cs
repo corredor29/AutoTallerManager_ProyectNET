@@ -50,6 +50,14 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
         }
 
+        [HttpPost("register-with-vehicle")]
+        [Authorize(Roles = AppRoles.AdminOrReceptionist)]
+        public async Task<IActionResult> RegisterWithVehicle([FromBody] RegisterCustomerWithVehicleRequest request)
+        {
+            var result = await _customerService.RegisterWithVehicleAsync(request);
+            return CreatedAtAction(nameof(GetById), new { id = result.Customer.Id }, result);
+        }
+
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerRequest request)

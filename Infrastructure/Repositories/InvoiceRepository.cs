@@ -20,10 +20,26 @@ public sealed class InvoiceRepository : IInvoiceRepository
     public async Task<PagedResult<Invoice>> GetAllPagedAsync(
         PaginationParams pagination, InvoiceFilter filter)
     {
-        var query = _dbContext.Invoices.AsQueryable();
+        var query = _dbContext.Invoices
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.Vehicle)
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.Appointment)
+                    .ThenInclude(x => x.Customer)
+                        .ThenInclude(x => x.Person)
+            .AsQueryable();
 
         query = query
             .WhereIf(filter.ServiceOrderId.HasValue, x => x.ServiceOrderId == filter.ServiceOrderId!.Value)
+            .WhereIf(filter.CustomerId.HasValue,
+                x => x.ServiceOrder.Appointment != null &&
+                    x.ServiceOrder.Appointment.CustomerId == filter.CustomerId!.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(filter.CustomerName),
+                x => x.ServiceOrder.Appointment != null &&
+                    EF.Functions.ILike(
+                        (x.ServiceOrder.Appointment.Customer.Person.FirstName.Value + " " +
+                         x.ServiceOrder.Appointment.Customer.Person.LastName.Value).Trim(),
+                        "%" + filter.CustomerName!.Trim() + "%"))
             .WhereIf(filter.DateFrom.HasValue,       x => x.IssuedAt >= filter.DateFrom!.Value)
             .WhereIf(filter.DateTo.HasValue,
                 x => x.IssuedAt <= filter.DateTo!.Value.Date.AddDays(1).AddTicks(-1));
@@ -49,12 +65,25 @@ public sealed class InvoiceRepository : IInvoiceRepository
 
     public async Task<Invoice?> GetByIdAsync(int id)
     {
-        return await _dbContext.Invoices.FirstOrDefaultAsync(x => x.Id == id);
+        return await _dbContext.Invoices
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.Vehicle)
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.Appointment)
+                    .ThenInclude(x => x.Customer)
+                        .ThenInclude(x => x.Person)
+            .FirstOrDefaultAsync(x => x.Id == id);
     }
 
     public async Task<IEnumerable<Invoice>> GetAllAsync()
     {
         return await _dbContext.Invoices
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.Vehicle)
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.Appointment)
+                    .ThenInclude(x => x.Customer)
+                        .ThenInclude(x => x.Person)
             .OrderByDescending(x => x.IssuedAt)
             .ToListAsync();
     }

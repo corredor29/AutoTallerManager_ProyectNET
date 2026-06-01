@@ -7,7 +7,12 @@ using Application.Filters;
 using Application.Requests.Customers;
 using Domain.Entities.Customers;
 using Domain.Entities.Persons;
+using Domain.Entities.Vehicles;
+using Domain.ValueObject.Persons.EmailDomain;
 using Domain.ValueObject.Persons.Person;
+using Domain.ValueObject.Persons.PersonEmail;
+using Domain.ValueObject.Persons.PersonPhone;
+using Domain.ValueObject.Vehicles.Vehicle;
 using Infrastructure.Context;
 using Mapster;
 using Domain.ValueObject.Persons.EmailDomain;
@@ -105,6 +110,70 @@ namespace Infrastructure.Services
             await _dbContext.SaveChangesAsync();
 
             return await GetByIdAsync(customer.Id) ?? MapToDto(customer);
+        }
+
+        public async Task<CustomerRegistrationDto> RegisterWithVehicleAsync(RegisterCustomerWithVehicleRequest request)
+        {
+            await using var transaction = _dbContext.Database.IsRelational()
+                ? await _dbContext.Database.BeginTransactionAsync()
+                : null;
+
+            var person = new Person(new PersonFirstName(request.FirstName), new PersonLastName(request.LastName));
+            await _dbContext.Persons.AddAsync(person);
+            await _dbContext.SaveChangesAsync();
+
+            var (emailUser, emailDomainValue) = ParseEmail(request.Email);
+            var emailDomain = await GetOrCreateEmailDomainAsync(emailDomainValue);
+
+            if (!await _dbContext.PhoneCodes.AnyAsync(x => x.Id == request.PhoneCodeId))
+            {
+                throw new ArgumentException($"Phone code {request.PhoneCodeId} does not exist.");
+            }
+
+            await _dbContext.PersonEmails.AddAsync(new PersonEmail(
+                person.Id,
+                emailDomain.Id,
+                new EmailUser(emailUser),
+                true));
+
+            await _dbContext.PersonPhones.AddAsync(new PersonPhone(
+                person.Id,
+                request.PhoneCodeId,
+                new PhoneNumber(request.PhoneNumber),
+                true));
+
+            var customer = new Customer(person.Id);
+            await _customerRepository.AddAsync(customer);
+            await _dbContext.SaveChangesAsync();
+
+            var vehicle = await CreateVehicleAsync(request.Vehicle);
+
+            await _dbContext.VehicleOwnershipHistories.AddAsync(new VehicleOwnershipHistory(
+                vehicle.Id,
+                customer.Id,
+                new Domain.ValueObject.Vehicles.VehicleOwnershipHistory.DateRange(
+                    DateOnly.FromDateTime(DateTime.UtcNow))));
+
+            await _dbContext.SaveChangesAsync();
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync();
+            }
+
+            var createdCustomer = await _customerRepository.GetByIdAsync(customer.Id)
+                ?? throw new InvalidOperationException("Customer could not be reloaded after registration.");
+
+            await _dbContext.Entry(vehicle).Reference(v => v.Model).LoadAsync();
+            await _dbContext.Entry(vehicle.Model).Reference(m => m.Brand).LoadAsync();
+            await _dbContext.Entry(vehicle).Reference(v => v.Color).LoadAsync();
+            await _dbContext.Entry(vehicle).Reference(v => v.FuelType).LoadAsync();
+            await _dbContext.Entry(vehicle).Reference(v => v.TransmissionType).LoadAsync();
+
+            return new CustomerRegistrationDto
+            {
+                Customer = createdCustomer.Adapt<CustomerDto>(),
+                Vehicle = MapVehicleToDto(vehicle)
+            };
         }
 
         public async Task<bool> UpdateAsync(int id, UpdateCustomerRequest request)

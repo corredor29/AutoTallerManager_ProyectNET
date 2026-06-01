@@ -10,6 +10,7 @@ namespace Application.Contracts.Services
         Task<PagedResult<CustomerDto>> GetAllPagedAsync(PaginationParams pagination, CustomerFilter filter);
         Task<CustomerDto?> GetByIdAsync(int id);
         Task<CustomerDto> CreateAsync(CreateCustomerRequest request);
+        Task<CustomerRegistrationDto> RegisterWithVehicleAsync(RegisterCustomerWithVehicleRequest request);
         Task<bool> UpdateAsync(int id, UpdateCustomerRequest request);
         Task<bool> DeleteAsync(int id);
     }

@@ -24,6 +24,9 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
             .Include(x => x.Vehicle)
                 .ThenInclude(x => x.Model)
                     .ThenInclude(x => x.Brand)
+            .Include(x => x.Appointment)
+                .ThenInclude(x => x.Customer)
+                    .ThenInclude(x => x.Person)
             .Include(x => x.ServiceType)
             .Include(x => x.OrderStatus)
             .Include(x => x.Mechanic)
@@ -34,6 +37,15 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
             .WhereIf(filter.OrderStatusId.HasValue, x => x.OrderStatusId == filter.OrderStatusId!.Value)
             .WhereIf(filter.MechanicId.HasValue,    x => x.MechanicId    == filter.MechanicId!.Value)
             .WhereIf(filter.ServiceTypeId.HasValue, x => x.ServiceTypeId == filter.ServiceTypeId!.Value)
+            .WhereIf(filter.CustomerId.HasValue,
+                x => x.Appointment != null && x.Appointment.CustomerId == filter.CustomerId!.Value)
+            .WhereIf(!string.IsNullOrWhiteSpace(filter.CustomerName),
+                x => x.Appointment != null &&
+                    EF.Functions.ILike(
+                        (x.Appointment.Customer.Person.FirstName.Value + " " + x.Appointment.Customer.Person.LastName.Value).Trim(),
+                        "%" + filter.CustomerName!.Trim() + "%"))
+            .WhereIf(!string.IsNullOrWhiteSpace(filter.VehicleVin),
+                x => EF.Functions.ILike(x.Vehicle.VIN.Value, "%" + filter.VehicleVin!.Trim() + "%"))
             .WhereIf(filter.DateFrom.HasValue,      x => x.CreatedAt >= filter.DateFrom!.Value)
             .WhereIf(filter.DateTo.HasValue,
                 x => x.CreatedAt <= filter.DateTo!.Value.Date.AddDays(1).AddTicks(-1));
@@ -63,6 +75,9 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
             .Include(x => x.Vehicle)
                 .ThenInclude(x => x.Model)
                     .ThenInclude(x => x.Brand)
+            .Include(x => x.Appointment)
+                .ThenInclude(x => x.Customer)
+                    .ThenInclude(x => x.Person)
             .Include(x => x.ServiceType)
             .Include(x => x.OrderStatus)
             .Include(x => x.Mechanic)
@@ -76,6 +91,9 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
             .Include(x => x.Vehicle)
                 .ThenInclude(x => x.Model)
                     .ThenInclude(x => x.Brand)
+            .Include(x => x.Appointment)
+                .ThenInclude(x => x.Customer)
+                    .ThenInclude(x => x.Person)
             .Include(x => x.ServiceType)
             .Include(x => x.OrderStatus)
             .Include(x => x.Mechanic)
