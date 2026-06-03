@@ -1,23 +1,31 @@
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
+using Application.DTOs.Notifications;
 using Application.DTOs.Suppliers;
 using Application.Requests.Suppliers;
 using Domain.Entities.Suppliers;
 using Domain.ValueObject.Suppliers.Supplier;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
 
 public sealed class SupplierService : ISupplierService
 {
-    private readonly ISupplierRepository _supplierRepository;
-    private readonly AutoTallerDbContext  _dbContext;
+    private readonly ISupplierRepository         _supplierRepository;
+    private readonly AutoTallerDbContext          _dbContext;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public SupplierService(ISupplierRepository supplierRepository, AutoTallerDbContext dbContext)
+    public SupplierService(
+        ISupplierRepository supplierRepository,
+        AutoTallerDbContext dbContext,
+        IHubContext<NotificationHub> hub)
     {
         _supplierRepository = supplierRepository;
         _dbContext          = dbContext;
+        _hub                = hub;
     }
 
     public async Task<IEnumerable<SupplierDto>> GetAllAsync()
@@ -47,6 +55,15 @@ public sealed class SupplierService : ISupplierService
         await _supplierRepository.AddAsync(supplier);
         await _dbContext.SaveChangesAsync();
 
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "create",
+            Entity     = "Supplier",
+            RecordId   = supplier.Id,
+            Message    = $"New supplier '{request.CompanyName}' registered",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return MapToDto(supplier);
     }
 
@@ -72,6 +89,16 @@ public sealed class SupplierService : ISupplierService
 
         _supplierRepository.Update(supplier);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "update",
+            Entity     = "Supplier",
+            RecordId   = id,
+            Message    = $"Supplier '{request.CompanyName}' updated",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -85,6 +112,16 @@ public sealed class SupplierService : ISupplierService
 
         _supplierRepository.Remove(supplier);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "delete",
+            Entity     = "Supplier",
+            RecordId   = id,
+            Message    = $"Supplier #{id} deleted",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -93,9 +130,7 @@ public sealed class SupplierService : ISupplierService
         if (string.IsNullOrWhiteSpace(taxId)) return;
 
         var normalizedTaxId = taxId.Trim().ToLower();
-
-        // ── Fix: ToListAsync + filtro en memoria ───────
-        var all = await _dbContext.Suppliers.ToListAsync();
+        var all    = await _dbContext.Suppliers.ToListAsync();
         var exists = all.Any(x =>
             x.TaxId?.Value != null &&
             x.TaxId.Value.ToLower() == normalizedTaxId &&
@@ -108,7 +143,7 @@ public sealed class SupplierService : ISupplierService
     private static SupplierDto MapToDto(Supplier supplier) => new()
     {
         Id          = supplier.Id,
-        CompanyName = supplier.CompanyName?.Value  ?? string.Empty,
+        CompanyName = supplier.CompanyName?.Value ?? string.Empty,
         TaxId       = supplier.TaxId?.Value,
         ContactName = supplier.ContactName?.Value,
         Phone       = supplier.Phone?.Value,

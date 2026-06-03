@@ -1,5 +1,6 @@
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
+using Application.DTOs.Notifications;
 using Application.DTOs.Quotations;
 using Application.Requests.Quotations;
 using Domain.Entities.Invoices;
@@ -7,19 +8,26 @@ using Domain.Entities.Quotations;
 using Domain.ValueObject.Invoices.Invoice;
 using Domain.ValueObject.Quotations.Quotation;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
 
 public sealed class QuotationService : IQuotationService
 {
-    private readonly IQuotationRepository _quotationRepository;
-    private readonly AutoTallerDbContext   _dbContext;
+    private readonly IQuotationRepository        _quotationRepository;
+    private readonly AutoTallerDbContext          _dbContext;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public QuotationService(IQuotationRepository quotationRepository, AutoTallerDbContext dbContext)
+    public QuotationService(
+        IQuotationRepository quotationRepository,
+        AutoTallerDbContext dbContext,
+        IHubContext<NotificationHub> hub)
     {
         _quotationRepository = quotationRepository;
         _dbContext           = dbContext;
+        _hub                 = hub;
     }
 
     public async Task<IEnumerable<QuotationDto>> GetAllAsync()
@@ -56,6 +64,15 @@ public sealed class QuotationService : IQuotationService
         var createdQuotation = await _quotationRepository.GetByIdAsync(quotation.Id)
             ?? throw new InvalidOperationException("Quotation could not be reloaded after creation.");
 
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "create",
+            Entity     = "Quotation",
+            RecordId   = quotation.Id,
+            Message    = $"New quotation #Q-{quotation.Id} created for order #SO-{request.ServiceOrderId}",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return MapToDto(createdQuotation);
     }
 
@@ -72,6 +89,16 @@ public sealed class QuotationService : IQuotationService
 
         _quotationRepository.Update(quotation);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "update",
+            Entity     = "Quotation",
+            RecordId   = id,
+            Message    = $"Quotation #Q-{id} updated",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -80,7 +107,6 @@ public sealed class QuotationService : IQuotationService
         var quotation = await _quotationRepository.GetByIdAsync(id);
         if (quotation is null) return false;
 
-        // ── Fix: ToListAsync + filtro en memoria ───────
         var allStatuses = await _dbContext.QuotationStatuses.ToListAsync();
         var status      = allStatuses.FirstOrDefault(x => x.Id == request.QuotationStatusId);
 
@@ -92,9 +118,7 @@ public sealed class QuotationService : IQuotationService
         quotation.ChangeStatus(request.QuotationStatusId);
 
         if (statusName.Equals("Accepted", StringComparison.OrdinalIgnoreCase))
-        {
             quotation.Accept();
-        }
         else if (statusName.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
         {
             quotation.Reject(new RejectionReason(request.RejectionReason));
@@ -103,6 +127,16 @@ public sealed class QuotationService : IQuotationService
 
         _quotationRepository.Update(quotation);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "status",
+            Entity     = "Quotation",
+            RecordId   = id,
+            Message    = $"Quotation #Q-{id} status changed to {statusName}",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -113,6 +147,16 @@ public sealed class QuotationService : IQuotationService
 
         _quotationRepository.Remove(quotation);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "delete",
+            Entity     = "Quotation",
+            RecordId   = id,
+            Message    = $"Quotation #Q-{id} deleted",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -166,9 +210,9 @@ public sealed class QuotationService : IQuotationService
             QuotationStatusName = quotation.QuotationStatus?.Name.Value ?? string.Empty,
             CreatedAt           = quotation.CreatedAt,
             RespondedAt         = quotation.RespondedAt,
-            LaborCost           = quotation.LaborCost?.Value        ?? 0,
-            Subtotal            = quotation.Subtotal?.Value         ?? 0,
-            Total               = quotation.Total?.Value            ?? 0,
+            LaborCost           = quotation.LaborCost?.Value    ?? 0,
+            Subtotal            = quotation.Subtotal?.Value     ?? 0,
+            Total               = quotation.Total?.Value        ?? 0,
             RejectionReason     = quotation.RejectionReason?.Value,
             Notes               = quotation.Notes?.Value
         };

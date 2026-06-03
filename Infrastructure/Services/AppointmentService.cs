@@ -1,10 +1,13 @@
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Appointments;
+using Application.DTOs.Notifications;
 using Application.Requests.Appointments;
 using Domain.Entities.Appointments;
 using Domain.ValueObject.Appointments.Appointment;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
@@ -13,13 +16,18 @@ public sealed class AppointmentService : IAppointmentService
 {
     private static readonly string[] ActiveAppointmentStatuses = ["pending", "confirmed"];
 
-    private readonly IAppointmentRepository _appointmentRepository;
-    private readonly AutoTallerDbContext     _dbContext;
+    private readonly IAppointmentRepository      _appointmentRepository;
+    private readonly AutoTallerDbContext          _dbContext;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public AppointmentService(IAppointmentRepository appointmentRepository, AutoTallerDbContext dbContext)
+    public AppointmentService(
+        IAppointmentRepository appointmentRepository,
+        AutoTallerDbContext dbContext,
+        IHubContext<NotificationHub> hub)
     {
         _appointmentRepository = appointmentRepository;
         _dbContext             = dbContext;
+        _hub                   = hub;
     }
 
     public async Task<IEnumerable<AppointmentDto>> GetAllAsync()
@@ -37,10 +45,8 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<AppointmentDto> CreateAsync(CreateAppointmentRequest request)
     {
         await EnsureRelatedEntitiesExistAsync(
-            request.CustomerId,
-            request.VehicleId,
-            request.ServiceTypeId,
-            request.AppointmentStatusId,
+            request.CustomerId, request.VehicleId,
+            request.ServiceTypeId, request.AppointmentStatusId,
             request.AssignedUserId);
 
         await EnsureMechanicAvailabilityAsync(
@@ -49,10 +55,8 @@ public sealed class AppointmentService : IAppointmentService
             request.ServiceTypeId);
 
         var appointment = new Appointment(
-            request.CustomerId,
-            request.VehicleId,
-            request.ServiceTypeId,
-            request.AppointmentStatusId,
+            request.CustomerId, request.VehicleId,
+            request.ServiceTypeId, request.AppointmentStatusId,
             new AppointmentDate(request.AppointmentDate),
             new AppointmentNotes(request.Notes),
             request.AssignedUserId);
@@ -62,6 +66,15 @@ public sealed class AppointmentService : IAppointmentService
 
         var createdAppointment = await _appointmentRepository.GetByIdAsync(appointment.Id)
             ?? throw new InvalidOperationException("Appointment could not be reloaded after creation.");
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "create",
+            Entity     = "Appointment",
+            RecordId   = appointment.Id,
+            Message    = $"New appointment #A-{appointment.Id} scheduled",
+            OccurredAt = DateTime.UtcNow
+        });
 
         return MapToDto(createdAppointment);
     }
@@ -88,6 +101,16 @@ public sealed class AppointmentService : IAppointmentService
 
         _appointmentRepository.Update(appointment);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "update",
+            Entity     = "Appointment",
+            RecordId   = id,
+            Message    = $"Appointment #A-{id} updated",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -102,6 +125,19 @@ public sealed class AppointmentService : IAppointmentService
         appointment.ChangeStatus(request.AppointmentStatusId);
         _appointmentRepository.Update(appointment);
         await _dbContext.SaveChangesAsync();
+
+        var allStatuses = await _dbContext.AppointmentStatuses.ToListAsync();
+        var statusName  = allStatuses.FirstOrDefault(x => x.Id == request.AppointmentStatusId)?.Name.Value ?? "Unknown";
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "status",
+            Entity     = "Appointment",
+            RecordId   = id,
+            Message    = $"Appointment #A-{id} status changed to {statusName}",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -116,6 +152,16 @@ public sealed class AppointmentService : IAppointmentService
 
         _appointmentRepository.Remove(appointment);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "delete",
+            Entity     = "Appointment",
+            RecordId   = id,
+            Message    = $"Appointment #A-{id} deleted",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -141,22 +187,19 @@ public sealed class AppointmentService : IAppointmentService
     }
 
     private async Task EnsureMechanicAvailabilityAsync(
-        int? assignedUserId,
-        DateTime appointmentDate,
-        int serviceTypeId,
-        int? excludeAppointmentId = null)
+        int? assignedUserId, DateTime appointmentDate,
+        int serviceTypeId, int? excludeAppointmentId = null)
     {
         if (!assignedUserId.HasValue) return;
 
-        // ── Fix: ToListAsync + filtro en memoria ───────
-        var serviceTypes = await _dbContext.ServiceTypes.ToListAsync();
-        var st           = serviceTypes.FirstOrDefault(x => x.Id == serviceTypeId);
+        var serviceTypes  = await _dbContext.ServiceTypes.ToListAsync();
+        var st            = serviceTypes.FirstOrDefault(x => x.Id == serviceTypeId);
         var durationHours = st?.EstimatedDuration?.Value ?? 1;
 
         var startAt = appointmentDate;
         var endAt   = appointmentDate.AddHours(durationHours > 0 ? durationHours : 1);
 
-        var activeStatuses = await _dbContext.AppointmentStatuses.ToListAsync();
+        var activeStatuses  = await _dbContext.AppointmentStatuses.ToListAsync();
         var activeStatusIds = activeStatuses
             .Where(s => ActiveAppointmentStatuses.Contains(s.Name.Value.ToLower()))
             .Select(s => s.Id)
@@ -211,10 +254,10 @@ public sealed class AppointmentService : IAppointmentService
             CustomerId            = appointment.CustomerId,
             CustomerName          = customerName,
             VehicleId             = appointment.VehicleId,
-            VehicleVin            = appointment.Vehicle?.VIN.Value          ?? string.Empty,
+            VehicleVin            = appointment.Vehicle?.VIN.Value           ?? string.Empty,
             VehicleDisplayName    = vehicleDisplayName,
             ServiceTypeId         = appointment.ServiceTypeId,
-            ServiceTypeName       = appointment.ServiceType?.Name.Value      ?? string.Empty,
+            ServiceTypeName       = appointment.ServiceType?.Name.Value       ?? string.Empty,
             AppointmentStatusId   = appointment.AppointmentStatusId,
             AppointmentStatusName = appointment.AppointmentStatus?.Name.Value ?? string.Empty,
             AssignedUserId        = appointment.AssignedUserId,

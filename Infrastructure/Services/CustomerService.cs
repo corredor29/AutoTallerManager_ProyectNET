@@ -2,6 +2,7 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Customers;
+using Application.DTOs.Notifications;
 using Application.DTOs.Persons;
 using Application.Filters;
 using Application.Requests.Customers;
@@ -15,19 +16,26 @@ using Domain.ValueObject.Persons.PersonEmail;
 using Domain.ValueObject.Persons.PersonPhone;
 using Domain.ValueObject.Vehicles.Vehicle;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services
 {
     public sealed class CustomerService : ICustomerService
     {
-        private readonly ICustomerRepository _customerRepository;
-        private readonly AutoTallerDbContext  _dbContext;
+        private readonly ICustomerRepository         _customerRepository;
+        private readonly AutoTallerDbContext          _dbContext;
+        private readonly IHubContext<NotificationHub> _hub;
 
-        public CustomerService(ICustomerRepository customerRepository, AutoTallerDbContext dbContext)
+        public CustomerService(
+            ICustomerRepository customerRepository,
+            AutoTallerDbContext dbContext,
+            IHubContext<NotificationHub> hub)
         {
             _customerRepository = customerRepository;
             _dbContext          = dbContext;
+            _hub                = hub;
         }
 
         public async Task<PagedResult<CustomerDto>> GetAllPagedAsync(
@@ -89,6 +97,15 @@ namespace Infrastructure.Services
             await _customerRepository.AddAsync(customer);
             await _dbContext.SaveChangesAsync();
 
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "create",
+                Entity     = "Customer",
+                RecordId   = customer.Id,
+                Message    = $"New customer {request.FirstName} {request.LastName} registered",
+                OccurredAt = DateTime.UtcNow
+            });
+
             return await GetByIdAsync(customer.Id) ?? MapToDto(customer);
         }
 
@@ -148,6 +165,15 @@ namespace Infrastructure.Services
                 await _dbContext.Entry(vehicle).Reference(v => v.FuelType).LoadAsync();
                 await _dbContext.Entry(vehicle).Reference(v => v.TransmissionType).LoadAsync();
 
+                await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+                {
+                    Type       = "create",
+                    Entity     = "Customer",
+                    RecordId   = customer.Id,
+                    Message    = $"New customer {request.FirstName} {request.LastName} registered with vehicle",
+                    OccurredAt = DateTime.UtcNow
+                });
+
                 return new CustomerRegistrationDto
                 {
                     Customer = MapToDto(createdCustomer),
@@ -178,6 +204,16 @@ namespace Infrastructure.Services
 
             _customerRepository.Update(customer);
             await _dbContext.SaveChangesAsync();
+
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "update",
+                Entity     = "Customer",
+                RecordId   = id,
+                Message    = $"Customer {request.FirstName} {request.LastName} updated",
+                OccurredAt = DateTime.UtcNow
+            });
+
             return true;
         }
 
@@ -189,6 +225,16 @@ namespace Infrastructure.Services
             await EnsureCustomerCanBeDeletedAsync(id);
             _customerRepository.Remove(customer);
             await _dbContext.SaveChangesAsync();
+
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "delete",
+                Entity     = "Customer",
+                RecordId   = id,
+                Message    = $"Customer #{id} deleted",
+                OccurredAt = DateTime.UtcNow
+            });
+
             return true;
         }
 
@@ -282,7 +328,7 @@ namespace Infrastructure.Services
             {
                 var primary = c.Person?.Emails?.FirstOrDefault(e => e.IsPrimary);
                 if (primary is null) return "—";
-                var user   = primary.EmailUser?.Value          ?? string.Empty;
+                var user   = primary.EmailUser?.Value           ?? string.Empty;
                 var domain = primary.EmailDomain?.Domain?.Value ?? string.Empty;
                 if (string.IsNullOrEmpty(user)) return "—";
                 if (string.IsNullOrEmpty(domain)) return user;

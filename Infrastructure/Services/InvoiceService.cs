@@ -2,11 +2,14 @@ using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Invoices;
+using Application.DTOs.Notifications;
 using Application.Filters;
 using Application.Requests.Invoices;
 using Domain.Entities.Invoices;
 using Domain.ValueObject.Invoices.Invoice;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
@@ -15,13 +18,18 @@ public sealed class InvoiceService : IInvoiceService
 {
     private static readonly string[] BillableStatuses = ["completed", "cancelled", "canceled"];
 
-    private readonly IInvoiceRepository _invoiceRepository;
-    private readonly AutoTallerDbContext _dbContext;
+    private readonly IInvoiceRepository          _invoiceRepository;
+    private readonly AutoTallerDbContext          _dbContext;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public InvoiceService(IInvoiceRepository invoiceRepository, AutoTallerDbContext dbContext)
+    public InvoiceService(
+        IInvoiceRepository invoiceRepository,
+        AutoTallerDbContext dbContext,
+        IHubContext<NotificationHub> hub)
     {
         _invoiceRepository = invoiceRepository;
         _dbContext         = dbContext;
+        _hub               = hub;
     }
 
     public async Task<PagedResult<InvoiceDto>> GetAllPagedAsync(
@@ -88,6 +96,15 @@ public sealed class InvoiceService : IInvoiceService
         var createdInvoice = await _invoiceRepository.GetByIdAsync(invoice.Id)
             ?? throw new InvalidOperationException("Invoice could not be reloaded after creation.");
 
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "create",
+            Entity     = "Invoice",
+            RecordId   = invoice.Id,
+            Message    = $"New invoice #INV-{invoice.Id} created for order #SO-{request.ServiceOrderId}",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return MapToDto(createdInvoice);
     }
 
@@ -112,6 +129,16 @@ public sealed class InvoiceService : IInvoiceService
 
         _invoiceRepository.Update(invoice);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "update",
+            Entity     = "Invoice",
+            RecordId   = id,
+            Message    = $"Invoice #INV-{id} updated",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -125,13 +152,22 @@ public sealed class InvoiceService : IInvoiceService
 
         _invoiceRepository.Remove(invoice);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "delete",
+            Entity     = "Invoice",
+            RecordId   = id,
+            Message    = $"Invoice #INV-{id} deleted",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
     // ── Helpers ────────────────────────────────────
     private async Task EnsureRelatedEntitiesExistAsync(int serviceOrderId, int? quotationId)
     {
-        // ── Fix: ToListAsync + filtro en memoria ───────
         var allOrders    = await _dbContext.ServiceOrders.Include(x => x.OrderStatus).ToListAsync();
         var serviceOrder = allOrders.FirstOrDefault(x => x.Id == serviceOrderId);
 
