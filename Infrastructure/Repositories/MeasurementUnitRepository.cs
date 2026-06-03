@@ -21,9 +21,8 @@ public sealed class MeasurementUnitRepository : IMeasurementUnitRepository
 
     public async Task<IEnumerable<MeasurementUnit>> GetAllAsync()
     {
-        return await _dbContext.MeasurementUnits
-            .OrderBy(x => x.Name.Value)
-            .ToListAsync();
+        var all = await _dbContext.MeasurementUnits.ToListAsync();
+        return all.OrderBy(x => x.Name.Value).ToList();
     }
 
     public async Task AddAsync(MeasurementUnit measurementUnit)

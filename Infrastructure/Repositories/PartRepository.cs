@@ -3,7 +3,6 @@ using Application.Contracts.Repositories;
 using Application.Filters;
 using Domain.Entities.Parts;
 using Infrastructure.Context;
-using Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
@@ -20,29 +19,39 @@ public sealed class PartRepository : IPartRepository
     public async Task<PagedResult<Part>> GetAllPagedAsync(
         PaginationParams pagination, PartFilter filter)
     {
-        var query = _dbContext.Parts
+        var allParts = await _dbContext.Parts
             .Include(p => p.Category)
             .Include(p => p.Unit)
-            .AsQueryable();
+            .ToListAsync();
 
-        query = query
-            .WhereIf(!string.IsNullOrWhiteSpace(filter.Description),
-                p => EF.Functions.ILike(p.Description.Value, "%" + filter.Description!.Trim() + "%"))
-            .WhereIf(!string.IsNullOrWhiteSpace(filter.Code),
-                p => EF.Functions.ILike(p.Code.Value, "%" + filter.Code!.Trim() + "%"))
-            .WhereIf(filter.PartCategoryId.HasValue, p => p.PartCategoryId == filter.PartCategoryId!.Value)
-            .WhereIf(filter.IsActive.HasValue,       p => p.IsActive == filter.IsActive!.Value)
-            .WhereIf(filter.BelowMinStock == true,   p => p.Stock.Value < p.MinStock.Value);
+        var query = allParts.AsQueryable();
 
-        var totalCount = await query.CountAsync();
-        var page = pagination.NormalizedPageNumber;
-        var size = pagination.NormalizedPageSize;
+        if (!string.IsNullOrWhiteSpace(filter.Description))
+            query = query.Where(p => p.Description.Value
+                .Contains(filter.Description.Trim(), StringComparison.OrdinalIgnoreCase));
 
-        var items = await query
+        if (!string.IsNullOrWhiteSpace(filter.Code))
+            query = query.Where(p => p.Code.Value
+                .Contains(filter.Code.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (filter.PartCategoryId.HasValue)
+            query = query.Where(p => p.PartCategoryId == filter.PartCategoryId.Value);
+
+        if (filter.IsActive.HasValue)
+            query = query.Where(p => p.IsActive == filter.IsActive.Value);
+
+        if (filter.BelowMinStock == true)
+            query = query.Where(p => p.Stock.Value < p.MinStock.Value);
+
+        var totalCount = query.Count();
+        var page       = pagination.NormalizedPageNumber;
+        var size       = pagination.NormalizedPageSize;
+
+        var items = query
             .OrderBy(p => p.Code.Value)
             .Skip((page - 1) * size)
             .Take(size)
-            .ToListAsync();
+            .ToList();
 
         return new PagedResult<Part>
         {
@@ -63,11 +72,12 @@ public sealed class PartRepository : IPartRepository
 
     public async Task<IEnumerable<Part>> GetAllAsync()
     {
-        return await _dbContext.Parts
+        var all = await _dbContext.Parts
             .Include(p => p.Category)
             .Include(p => p.Unit)
-            .OrderBy(p => p.Code.Value)
             .ToListAsync();
+
+        return all.OrderBy(p => p.Code.Value).ToList();
     }
 
     public async Task AddAsync(Part part)

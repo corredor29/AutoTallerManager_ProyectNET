@@ -21,9 +21,8 @@ public sealed class PartCategoryRepository : IPartCategoryRepository
 
     public async Task<IEnumerable<PartCategory>> GetAllAsync()
     {
-        return await _dbContext.PartCategories
-            .OrderBy(x => x.Name.Value)
-            .ToListAsync();
+        var all = await _dbContext.PartCategories.ToListAsync();
+        return all.OrderBy(x => x.Name.Value).ToList();
     }
 
     public async Task AddAsync(PartCategory partCategory)

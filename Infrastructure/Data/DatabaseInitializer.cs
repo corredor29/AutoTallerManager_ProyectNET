@@ -28,6 +28,9 @@ using Domain.ValueObject.Persons.DocumentType;
 using Domain.ValueObject.Persons.EmailDomain;
 using Domain.ValueObject.Persons.PhoneCode;
 using Domain.ValueObject.Audit.AuditActionType;
+using Domain.Entities.Parts;
+using Domain.ValueObject.Parts.PartCategory;
+using Domain.ValueObject.Parts.MeasurementUnit;
 
 namespace Infrastructure.Data;
 
@@ -64,6 +67,8 @@ public class DatabaseInitializer
         await SeedFuelTypesAsync();
         await SeedTransmissionTypesAsync();
         await SeedAuditActionTypesAsync();
+        await SeedPartCategoriesAsync();
+        await SeedMeasurementUnitsAsync();
     }
 
     private async Task SeedAppointmentStatusesAsync()
@@ -465,6 +470,47 @@ public class DatabaseInitializer
             new AuditActionType(new AuditActionTypeName("Logout"))
         };
         await _dbContext.AuditActionTypes.AddRangeAsync(actionTypes);
+        await _dbContext.SaveChangesAsync();
+    }
+    private async Task SeedPartCategoriesAsync()
+    {
+        if (await _dbContext.PartCategories.AnyAsync()) return;
+
+        var categories = new[]
+        {
+            new PartCategory(new PartCategoryName("Engine")),
+            new PartCategory(new PartCategoryName("Brakes")),
+            new PartCategory(new PartCategoryName("Suspension")),
+            new PartCategory(new PartCategoryName("Electrical")),
+            new PartCategory(new PartCategoryName("Transmission")),
+            new PartCategory(new PartCategoryName("Cooling System")),
+            new PartCategory(new PartCategoryName("Exhaust")),
+            new PartCategory(new PartCategoryName("Filters")),
+            new PartCategory(new PartCategoryName("Tires & Wheels")),
+            new PartCategory(new PartCategoryName("Body & Exterior"))
+        };
+
+        await _dbContext.PartCategories.AddRangeAsync(categories);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task SeedMeasurementUnitsAsync()
+    {
+        if (await _dbContext.MeasurementUnits.AnyAsync()) return;
+
+        var units = new[]
+        {
+            new MeasurementUnit(new MeasurementUnitName("Unit"),       new MeasurementUnitAbbreviation("un")),
+            new MeasurementUnit(new MeasurementUnitName("Liter"),      new MeasurementUnitAbbreviation("L")),
+            new MeasurementUnit(new MeasurementUnitName("Milliliter"), new MeasurementUnitAbbreviation("mL")),
+            new MeasurementUnit(new MeasurementUnitName("Kilogram"),   new MeasurementUnitAbbreviation("kg")),
+            new MeasurementUnit(new MeasurementUnitName("Gram"),       new MeasurementUnitAbbreviation("g")),
+            new MeasurementUnit(new MeasurementUnitName("Meter"),      new MeasurementUnitAbbreviation("m")),
+            new MeasurementUnit(new MeasurementUnitName("Set"),        new MeasurementUnitAbbreviation("set")),
+            new MeasurementUnit(new MeasurementUnitName("Pair"),       new MeasurementUnitAbbreviation("par"))
+        };
+
+        await _dbContext.MeasurementUnits.AddRangeAsync(units);
         await _dbContext.SaveChangesAsync();
     }
 }
