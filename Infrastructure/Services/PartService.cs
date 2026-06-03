@@ -1,25 +1,33 @@
 using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
+using Application.DTOs.Notifications;
 using Application.DTOs.Parts;
 using Application.Filters;
 using Application.Requests.Parts;
 using Domain.Entities.Parts;
 using Domain.ValueObject.Parts.Part;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services;
 
 public sealed class PartService : IPartService
 {
-    private readonly IPartRepository    _partRepository;
-    private readonly AutoTallerDbContext _dbContext;
+    private readonly IPartRepository             _partRepository;
+    private readonly AutoTallerDbContext          _dbContext;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public PartService(IPartRepository partRepository, AutoTallerDbContext dbContext)
+    public PartService(
+        IPartRepository partRepository,
+        AutoTallerDbContext dbContext,
+        IHubContext<NotificationHub> hub)
     {
         _partRepository = partRepository;
         _dbContext      = dbContext;
+        _hub            = hub;
     }
 
     public async Task<PagedResult<PartDto>> GetAllPagedAsync(
@@ -61,6 +69,15 @@ public sealed class PartService : IPartService
         var createdPart = await _partRepository.GetByIdAsync(part.Id)
             ?? throw new InvalidOperationException("Part could not be reloaded after creation.");
 
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "create",
+            Entity     = "Part",
+            RecordId   = part.Id,
+            Message    = $"New part '{request.Code}' added to inventory",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return MapToDto(createdPart);
     }
 
@@ -84,6 +101,29 @@ public sealed class PartService : IPartService
 
         _partRepository.Update(part);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "update",
+            Entity     = "Part",
+            RecordId   = id,
+            Message    = $"Part '{request.Code}' updated",
+            OccurredAt = DateTime.UtcNow
+        });
+
+        // Notificar si stock bajo
+        if (request.Stock <= request.MinStock)
+        {
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "warning",
+                Entity     = "Part",
+                RecordId   = id,
+                Message    = $" Part '{request.Code}' is below minimum stock ({request.Stock}/{request.MinStock})",
+                OccurredAt = DateTime.UtcNow
+            });
+        }
+
         return true;
     }
 
@@ -98,6 +138,16 @@ public sealed class PartService : IPartService
 
         _partRepository.Remove(part);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "delete",
+            Entity     = "Part",
+            RecordId   = id,
+            Message    = $"Part #{id} deleted from inventory",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -113,9 +163,7 @@ public sealed class PartService : IPartService
     private async Task EnsureCodeIsUniqueAsync(string code, int? excludeId = null)
     {
         var normalizedCode = code.Trim().ToUpper();
-
-        // ── Fix: ToListAsync + filtro en memoria ───────
-        var all = await _dbContext.Parts.ToListAsync();
+        var all    = await _dbContext.Parts.ToListAsync();
         var exists = all.Any(x =>
             x.Code.Value.ToUpper() == normalizedCode &&
             (!excludeId.HasValue || x.Id != excludeId.Value));
@@ -128,15 +176,15 @@ public sealed class PartService : IPartService
     {
         Id               = part.Id,
         PartCategoryId   = part.PartCategoryId,
-        PartCategoryName = part.Category?.Name.Value   ?? string.Empty,
+        PartCategoryName = part.Category?.Name.Value    ?? string.Empty,
         UnitId           = part.UnitId,
         UnitName         = part.Unit?.Name.Value,
         UnitAbbreviation = part.Unit?.Abbreviation.Value,
-        Code             = part.Code?.Value             ?? string.Empty,
-        Description      = part.Description?.Value      ?? string.Empty,
-        Stock            = part.Stock?.Value            ?? 0,
-        MinStock         = part.MinStock?.Value         ?? 0,
-        UnitPrice        = part.UnitPrice?.Value        ?? 0,
+        Code             = part.Code?.Value              ?? string.Empty,
+        Description      = part.Description?.Value       ?? string.Empty,
+        Stock            = part.Stock?.Value             ?? 0,
+        MinStock         = part.MinStock?.Value          ?? 0,
+        UnitPrice        = part.UnitPrice?.Value         ?? 0,
         IsActive         = part.IsActive
     };
 }

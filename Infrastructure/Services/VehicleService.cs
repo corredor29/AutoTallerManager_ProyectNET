@@ -1,25 +1,33 @@
 using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
+using Application.DTOs.Notifications;
 using Application.DTOs.Vehicles;
 using Application.Filters;
 using Application.Requests.Vehicles;
 using Domain.Entities.Vehicles;
 using Domain.ValueObject.Vehicles.Vehicle;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Services
 {
     public sealed class VehicleService : IVehicleService
     {
-        private readonly IVehicleRepository _vehicleRepository;
-        private readonly AutoTallerDbContext _dbContext;
+        private readonly IVehicleRepository          _vehicleRepository;
+        private readonly AutoTallerDbContext          _dbContext;
+        private readonly IHubContext<NotificationHub> _hub;
 
-        public VehicleService(IVehicleRepository vehicleRepository, AutoTallerDbContext dbContext)
+        public VehicleService(
+            IVehicleRepository vehicleRepository,
+            AutoTallerDbContext dbContext,
+            IHubContext<NotificationHub> hub)
         {
             _vehicleRepository = vehicleRepository;
             _dbContext         = dbContext;
+            _hub               = hub;
         }
 
         public async Task<PagedResult<VehicleDto>> GetAllPagedAsync(
@@ -84,6 +92,15 @@ namespace Infrastructure.Services
                 .Include(o => o.Customer).ThenInclude(c => c.Person)
                 .LoadAsync();
 
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "create",
+                Entity     = "Vehicle",
+                RecordId   = vehicle.Id,
+                Message    = $"New vehicle VIN {request.Vin} registered",
+                OccurredAt = DateTime.UtcNow
+            });
+
             return MapToDto(vehicle);
         }
 
@@ -104,6 +121,16 @@ namespace Infrastructure.Services
 
             _vehicleRepository.Update(vehicle);
             await _dbContext.SaveChangesAsync();
+
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "update",
+                Entity     = "Vehicle",
+                RecordId   = id,
+                Message    = $"Vehicle #{id} updated",
+                OccurredAt = DateTime.UtcNow
+            });
+
             return true;
         }
 
@@ -113,9 +140,18 @@ namespace Infrastructure.Services
             if (vehicle is null) return false;
 
             await EnsureVehicleCanBeDeletedAsync(id);
-
             _vehicleRepository.Remove(vehicle);
             await _dbContext.SaveChangesAsync();
+
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "delete",
+                Entity     = "Vehicle",
+                RecordId   = id,
+                Message    = $"Vehicle #{id} deleted",
+                OccurredAt = DateTime.UtcNow
+            });
+
             return true;
         }
 
