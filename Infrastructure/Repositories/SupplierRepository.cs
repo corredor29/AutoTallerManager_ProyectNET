@@ -21,9 +21,8 @@ public sealed class SupplierRepository : ISupplierRepository
 
     public async Task<IEnumerable<Supplier>> GetAllAsync()
     {
-        return await _dbContext.Suppliers
-            .OrderBy(x => x.CompanyName.Value)
-            .ToListAsync();
+        var all = await _dbContext.Suppliers.ToListAsync();
+        return all.OrderBy(x => x.CompanyName.Value).ToList();
     }
 
     public async Task AddAsync(Supplier supplier)

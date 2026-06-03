@@ -3,7 +3,6 @@ using Application.Contracts.Repositories;
 using Application.Filters;
 using Domain.Entities.Invoices;
 using Infrastructure.Context;
-using Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
@@ -20,39 +19,52 @@ public sealed class InvoiceRepository : IInvoiceRepository
     public async Task<PagedResult<Invoice>> GetAllPagedAsync(
         PaginationParams pagination, InvoiceFilter filter)
     {
-        var query = _dbContext.Invoices
+        // Traer todo a memoria primero
+        var allInvoices = await _dbContext.Invoices
             .Include(x => x.ServiceOrder)
                 .ThenInclude(x => x.Vehicle)
+                    .ThenInclude(x => x.Ownerships)
+                        .ThenInclude(o => o.Customer)
+                            .ThenInclude(c => c.Person)
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.OrderStatus)
             .Include(x => x.ServiceOrder)
                 .ThenInclude(x => x.Appointment)
-                    .ThenInclude(x => x.Customer)
+                    .ThenInclude(x => x!.Customer)
                         .ThenInclude(x => x.Person)
-            .AsQueryable();
-
-        query = query
-            .WhereIf(filter.ServiceOrderId.HasValue, x => x.ServiceOrderId == filter.ServiceOrderId!.Value)
-            .WhereIf(filter.CustomerId.HasValue,
-                x => x.ServiceOrder.Appointment != null &&
-                    x.ServiceOrder.Appointment.CustomerId == filter.CustomerId!.Value)
-            .WhereIf(!string.IsNullOrWhiteSpace(filter.CustomerName),
-                x => x.ServiceOrder.Appointment != null &&
-                    EF.Functions.ILike(
-                        (x.ServiceOrder.Appointment.Customer.Person.FirstName.Value + " " +
-                         x.ServiceOrder.Appointment.Customer.Person.LastName.Value).Trim(),
-                        "%" + filter.CustomerName!.Trim() + "%"))
-            .WhereIf(filter.DateFrom.HasValue,       x => x.IssuedAt >= filter.DateFrom!.Value)
-            .WhereIf(filter.DateTo.HasValue,
-                x => x.IssuedAt <= filter.DateTo!.Value.Date.AddDays(1).AddTicks(-1));
-
-        var totalCount = await query.CountAsync();
-        var page = pagination.NormalizedPageNumber;
-        var size = pagination.NormalizedPageSize;
-
-        var items = await query
-            .OrderByDescending(x => x.IssuedAt)
-            .Skip((page - 1) * size)
-            .Take(size)
             .ToListAsync();
+
+        // Filtrar en memoria
+        var query = allInvoices.AsEnumerable();
+
+        if (filter.ServiceOrderId.HasValue)
+            query = query.Where(x => x.ServiceOrderId == filter.ServiceOrderId.Value);
+
+        if (filter.CustomerId.HasValue)
+        {
+            var cid = filter.CustomerId.Value;
+            query = query.Where(x =>
+                GetCustomerId(x) == cid);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.CustomerName))
+        {
+            var name = filter.CustomerName.Trim().ToLower();
+            query = query.Where(x =>
+                GetCustomerName(x).ToLower().Contains(name));
+        }
+
+        if (filter.DateFrom.HasValue)
+            query = query.Where(x => x.IssuedAt >= filter.DateFrom.Value);
+
+        if (filter.DateTo.HasValue)
+            query = query.Where(x => x.IssuedAt <= filter.DateTo.Value.Date.AddDays(1).AddTicks(-1));
+
+        var filtered    = query.OrderByDescending(x => x.IssuedAt).ToList();
+        var totalCount  = filtered.Count;
+        var page        = pagination.NormalizedPageNumber;
+        var size        = pagination.NormalizedPageSize;
+        var items       = filtered.Skip((page - 1) * size).Take(size).ToList();
 
         return new PagedResult<Invoice>
         {
@@ -68,9 +80,14 @@ public sealed class InvoiceRepository : IInvoiceRepository
         return await _dbContext.Invoices
             .Include(x => x.ServiceOrder)
                 .ThenInclude(x => x.Vehicle)
+                    .ThenInclude(x => x.Ownerships)
+                        .ThenInclude(o => o.Customer)
+                            .ThenInclude(c => c.Person)
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.OrderStatus)
             .Include(x => x.ServiceOrder)
                 .ThenInclude(x => x.Appointment)
-                    .ThenInclude(x => x.Customer)
+                    .ThenInclude(x => x!.Customer)
                         .ThenInclude(x => x.Person)
             .FirstOrDefaultAsync(x => x.Id == id);
     }
@@ -80,9 +97,14 @@ public sealed class InvoiceRepository : IInvoiceRepository
         return await _dbContext.Invoices
             .Include(x => x.ServiceOrder)
                 .ThenInclude(x => x.Vehicle)
+                    .ThenInclude(x => x.Ownerships)
+                        .ThenInclude(o => o.Customer)
+                            .ThenInclude(c => c.Person)
+            .Include(x => x.ServiceOrder)
+                .ThenInclude(x => x.OrderStatus)
             .Include(x => x.ServiceOrder)
                 .ThenInclude(x => x.Appointment)
-                    .ThenInclude(x => x.Customer)
+                    .ThenInclude(x => x!.Customer)
                         .ThenInclude(x => x.Person)
             .OrderByDescending(x => x.IssuedAt)
             .ToListAsync();
@@ -101,5 +123,33 @@ public sealed class InvoiceRepository : IInvoiceRepository
     public void Remove(Invoice invoice)
     {
         _dbContext.Invoices.Remove(invoice);
+    }
+
+    // ── Helpers ────────────────────────────────────
+    private static string GetCustomerName(Invoice x)
+    {
+        if (x.ServiceOrder?.Appointment?.Customer?.Person != null)
+        {
+            var p = x.ServiceOrder.Appointment.Customer.Person;
+            return $"{p.FirstName.Value} {p.LastName.Value}".Trim();
+        }
+        var owner = x.ServiceOrder?.Vehicle?.Ownerships?
+            .FirstOrDefault(o => o.DateRange.EndDate == null);
+        if (owner?.Customer?.Person != null)
+        {
+            var p = owner.Customer.Person;
+            return $"{p.FirstName.Value} {p.LastName.Value}".Trim();
+        }
+        return string.Empty;
+    }
+
+    private static int? GetCustomerId(Invoice x)
+    {
+        if (x.ServiceOrder?.Appointment?.CustomerId != null)
+            return x.ServiceOrder.Appointment.CustomerId;
+
+        var owner = x.ServiceOrder?.Vehicle?.Ownerships?
+            .FirstOrDefault(o => o.DateRange.EndDate == null);
+        return owner?.CustomerId;
     }
 }

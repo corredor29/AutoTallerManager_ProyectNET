@@ -14,12 +14,12 @@ public sealed class AppointmentService : IAppointmentService
     private static readonly string[] ActiveAppointmentStatuses = ["pending", "confirmed"];
 
     private readonly IAppointmentRepository _appointmentRepository;
-    private readonly AutoTallerDbContext _dbContext;
+    private readonly AutoTallerDbContext     _dbContext;
 
     public AppointmentService(IAppointmentRepository appointmentRepository, AutoTallerDbContext dbContext)
     {
         _appointmentRepository = appointmentRepository;
-        _dbContext = dbContext;
+        _dbContext             = dbContext;
     }
 
     public async Task<IEnumerable<AppointmentDto>> GetAllAsync()
@@ -69,16 +69,11 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<bool> UpdateAsync(int id, UpdateAppointmentRequest request)
     {
         var appointment = await _appointmentRepository.GetByIdAsync(id);
-        if (appointment is null)
-        {
-            return false;
-        }
+        if (appointment is null) return false;
 
         if (request.AssignedUserId.HasValue &&
             !await _dbContext.Users.AnyAsync(x => x.Id == request.AssignedUserId.Value && x.IsActive))
-        {
             throw new ArgumentException($"Assigned user {request.AssignedUserId.Value} does not exist or is inactive.");
-        }
 
         await EnsureMechanicAvailabilityAsync(
             request.AssignedUserId,
@@ -99,15 +94,10 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<bool> ChangeStatusAsync(int id, ChangeAppointmentStatusRequest request)
     {
         var appointment = await _appointmentRepository.GetByIdAsync(id);
-        if (appointment is null)
-        {
-            return false;
-        }
+        if (appointment is null) return false;
 
         if (!await _dbContext.AppointmentStatuses.AnyAsync(x => x.Id == request.AppointmentStatusId))
-        {
             throw new ArgumentException($"Appointment status {request.AppointmentStatusId} does not exist.");
-        }
 
         appointment.ChangeStatus(request.AppointmentStatusId);
         _appointmentRepository.Update(appointment);
@@ -118,15 +108,11 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<bool> DeleteAsync(int id)
     {
         var appointment = await _appointmentRepository.GetByIdAsync(id);
-        if (appointment is null)
-        {
-            return false;
-        }
+        if (appointment is null) return false;
 
         if (await _dbContext.ServiceOrders.AnyAsync(x => x.AppointmentId == id))
-        {
-            throw new InvalidOperationException($"Appointment {id} is being used by a service order and cannot be deleted.");
-        }
+            throw new InvalidOperationException(
+                $"Appointment {id} is being used by a service order and cannot be deleted.");
 
         _appointmentRepository.Remove(appointment);
         await _dbContext.SaveChangesAsync();
@@ -134,37 +120,24 @@ public sealed class AppointmentService : IAppointmentService
     }
 
     private async Task EnsureRelatedEntitiesExistAsync(
-        int customerId,
-        int vehicleId,
-        int serviceTypeId,
-        int appointmentStatusId,
-        int? assignedUserId)
+        int customerId, int vehicleId, int serviceTypeId,
+        int appointmentStatusId, int? assignedUserId)
     {
         if (!await _dbContext.Customers.AnyAsync(x => x.Id == customerId))
-        {
             throw new ArgumentException($"Customer {customerId} does not exist.");
-        }
 
         if (!await _dbContext.Vehicles.AnyAsync(x => x.Id == vehicleId))
-        {
             throw new ArgumentException($"Vehicle {vehicleId} does not exist.");
-        }
 
         if (!await _dbContext.ServiceTypes.AnyAsync(x => x.Id == serviceTypeId))
-        {
             throw new ArgumentException($"Service type {serviceTypeId} does not exist.");
-        }
 
         if (!await _dbContext.AppointmentStatuses.AnyAsync(x => x.Id == appointmentStatusId))
-        {
             throw new ArgumentException($"Appointment status {appointmentStatusId} does not exist.");
-        }
 
         if (assignedUserId.HasValue &&
             !await _dbContext.Users.AnyAsync(x => x.Id == assignedUserId.Value && x.IsActive))
-        {
             throw new ArgumentException($"Assigned user {assignedUserId.Value} does not exist or is inactive.");
-        }
     }
 
     private async Task EnsureMechanicAvailabilityAsync(
@@ -173,44 +146,49 @@ public sealed class AppointmentService : IAppointmentService
         int serviceTypeId,
         int? excludeAppointmentId = null)
     {
-        if (!assignedUserId.HasValue)
-        {
-            return;
-        }
+        if (!assignedUserId.HasValue) return;
 
-        var durationHours = await _dbContext.ServiceTypes
-            .Where(x => x.Id == serviceTypeId)
-            .Select(x => x.EstimatedDuration.Value)
-            .FirstOrDefaultAsync();
+        // ── Fix: ToListAsync + filtro en memoria ───────
+        var serviceTypes = await _dbContext.ServiceTypes.ToListAsync();
+        var st           = serviceTypes.FirstOrDefault(x => x.Id == serviceTypeId);
+        var durationHours = st?.EstimatedDuration?.Value ?? 1;
 
         var startAt = appointmentDate;
-        var endAt = appointmentDate.AddHours(durationHours.GetValueOrDefault() > 0 ? durationHours.Value : 1);
+        var endAt   = appointmentDate.AddHours(durationHours > 0 ? durationHours : 1);
 
-        var hasConflictingAppointment = await _dbContext.Appointments
+        var activeStatuses = await _dbContext.AppointmentStatuses.ToListAsync();
+        var activeStatusIds = activeStatuses
+            .Where(s => ActiveAppointmentStatuses.Contains(s.Name.Value.ToLower()))
+            .Select(s => s.Id)
+            .ToList();
+
+        var appointments = await _dbContext.Appointments
+            .Include(x => x.ServiceType)
             .Where(x => x.AssignedUserId == assignedUserId.Value)
             .Where(x => !excludeAppointmentId.HasValue || x.Id != excludeAppointmentId.Value)
-            .Where(x => ActiveAppointmentStatuses.Contains(x.AppointmentStatus.Name.Value.ToLower()))
-            .AnyAsync(x =>
-                x.AppointmentDate.Value < endAt &&
-                x.AppointmentDate.Value.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1) > startAt);
+            .Where(x => activeStatusIds.Contains(x.AppointmentStatusId))
+            .ToListAsync();
 
-        if (hasConflictingAppointment)
-        {
+        var hasConflict = appointments.Any(x =>
+            x.AppointmentDate.Value < endAt &&
+            x.AppointmentDate.Value.AddHours(x.ServiceType?.EstimatedDuration?.Value ?? 1) > startAt);
+
+        if (hasConflict)
             throw new InvalidOperationException(
                 $"Mechanic {assignedUserId.Value} already has another appointment scheduled in that time range.");
-        }
 
-        var hasConflictingServiceOrder = await _dbContext.ServiceOrders
+        var serviceOrders = await _dbContext.ServiceOrders
+            .Include(x => x.ServiceType)
             .Where(x => x.MechanicId == assignedUserId.Value && x.ClosedAt == null)
-            .AnyAsync(x =>
-                x.CreatedAt < endAt &&
-                (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1)) > startAt);
+            .ToListAsync();
 
-        if (hasConflictingServiceOrder)
-        {
+        var hasSOConflict = serviceOrders.Any(x =>
+            x.CreatedAt < endAt &&
+            (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType?.EstimatedDuration?.Value ?? 1)) > startAt);
+
+        if (hasSOConflict)
             throw new InvalidOperationException(
                 $"Mechanic {assignedUserId.Value} already has a service order in progress for that time range.");
-        }
     }
 
     private static AppointmentDto MapToDto(Appointment appointment)
@@ -229,20 +207,20 @@ public sealed class AppointmentService : IAppointmentService
 
         return new AppointmentDto
         {
-            Id = appointment.Id,
-            CustomerId = appointment.CustomerId,
-            CustomerName = customerName,
-            VehicleId = appointment.VehicleId,
-            VehicleVin = appointment.Vehicle?.VIN.Value ?? string.Empty,
-            VehicleDisplayName = vehicleDisplayName,
-            ServiceTypeId = appointment.ServiceTypeId,
-            ServiceTypeName = appointment.ServiceType?.Name.Value ?? string.Empty,
-            AppointmentStatusId = appointment.AppointmentStatusId,
+            Id                    = appointment.Id,
+            CustomerId            = appointment.CustomerId,
+            CustomerName          = customerName,
+            VehicleId             = appointment.VehicleId,
+            VehicleVin            = appointment.Vehicle?.VIN.Value          ?? string.Empty,
+            VehicleDisplayName    = vehicleDisplayName,
+            ServiceTypeId         = appointment.ServiceTypeId,
+            ServiceTypeName       = appointment.ServiceType?.Name.Value      ?? string.Empty,
+            AppointmentStatusId   = appointment.AppointmentStatusId,
             AppointmentStatusName = appointment.AppointmentStatus?.Name.Value ?? string.Empty,
-            AssignedUserId = appointment.AssignedUserId,
-            AssignedUserName = assignedUserName,
-            AppointmentDate = appointment.AppointmentDate.Value,
-            Notes = appointment.Notes.Value
+            AssignedUserId        = appointment.AssignedUserId,
+            AssignedUserName      = assignedUserName,
+            AppointmentDate       = appointment.AppointmentDate.Value,
+            Notes                 = appointment.Notes.Value
         };
     }
 }
