@@ -38,12 +38,12 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
         var response = new ApiErrorResponse
         {
-            Success = false,
+            Success    = false,
             StatusCode = StatusCodes.Status400BadRequest,
-            Title = "Validation failed",
-            Detail = "One or more validation errors occurred.",
-            TraceId = context.HttpContext.TraceIdentifier,
-            Errors = errors
+            Title      = "Validation failed",
+            Detail     = "One or more validation errors occurred.",
+            TraceId    = context.HttpContext.TraceIdentifier,
+            Errors     = errors
         };
 
         return new BadRequestObjectResult(response);
@@ -55,8 +55,8 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title   = "AutoTallerManager API",
-        Version = "v1",
+        Title       = "AutoTallerManager API",
+        Version     = "v1",
         Description = "Sistema de Gestión de Taller Automotriz"
     });
 
@@ -72,7 +72,6 @@ builder.Services.AddSwaggerGen(options =>
 
     options.AddSecurityDefinition("Bearer", securityScheme);
 
-    // ← Fix: versión clásica compatible con .NET 10
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -123,6 +122,7 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, cancellationToken) =>
     {
         context.HttpContext.Response.ContentType = "application/json";
+        context.HttpContext.Response.Headers["Retry-After"] = "60";
 
         var response = new ApiErrorResponse
         {
@@ -138,6 +138,20 @@ builder.Services.AddRateLimiter(options =>
             cancellationToken);
     };
 
+    // ── Auth ───────────────────────────────────────
+    options.AddPolicy("auth", _ =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "auth",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit          = 30,
+                Window               = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit           = 0,
+                AutoReplenishment    = true
+            }));
+
+    // ── Service Orders ─────────────────────────────
     options.AddPolicy("service-orders", _ =>
         RateLimitPartition.GetFixedWindowLimiter(
             "service-orders",
@@ -150,6 +164,7 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment    = true
             }));
 
+    // ── Parts ──────────────────────────────────────
     options.AddPolicy("parts", _ =>
         RateLimitPartition.GetFixedWindowLimiter(
             "parts",
@@ -175,7 +190,8 @@ builder.Services.AddCors(options =>
                 "http://127.0.0.1:3000"
             )
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .WithExposedHeaders("Retry-After"); 
     });
 });
 
