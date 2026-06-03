@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace Application.Requests.Auth
 {
-using System.ComponentModel.DataAnnotations;
-
-
     public sealed class RegisterRequest
     {
         [Required]
@@ -25,5 +19,8 @@ using System.ComponentModel.DataAnnotations;
         [Required]
         [StringLength(255, MinimumLength = 6)]
         public string Password { get; init; } = string.Empty;
+
+        [StringLength(50)]
+        public string? Role { get; init; }
     }
 }
