@@ -126,7 +126,7 @@ namespace Infrastructure.Services
                 await _dbContext.SaveChangesAsync();
             }
 
-            var allEmails  = await _dbContext.PersonEmails.ToListAsync();
+            var allEmails   = await _dbContext.PersonEmails.ToListAsync();
             var emailExists = allEmails.Any(e =>
                 e.EmailUser.Value == emailUser && e.EmailDomainId == domainEntity.Id);
 
@@ -146,15 +146,18 @@ namespace Infrastructure.Services
             await _dbContext.PersonEmails.AddAsync(personEmail);
 
             var passwordHash = new PasswordHash(BCrypt.Net.BCrypt.HashPassword(request.Password));
-            var user = new User(person.Id, passwordHash);
+            var user         = new User(person.Id, passwordHash);
             await _dbContext.Users.AddAsync(user);
             await _dbContext.SaveChangesAsync();
 
-            var allRoles = await _dbContext.Roles.ToListAsync();
-            var receptionistRole = allRoles.FirstOrDefault(r => r.RoleName.Value == "Receptionist")
-                ?? throw new InvalidOperationException("Receptionist role not found.");
+            // ── Asignar rol según request, fallback a Receptionist ──
+            var allRoles     = await _dbContext.Roles.ToListAsync();
+            var roleName     = string.IsNullOrWhiteSpace(request.Role) ? "Receptionist" : request.Role.Trim();
+            var assignedRole = allRoles.FirstOrDefault(r => r.RoleName.Value == roleName)
+                ?? allRoles.FirstOrDefault(r => r.RoleName.Value == "Receptionist")
+                ?? throw new InvalidOperationException("Role not found.");
 
-            var userRole = new UserRole(user.Id, receptionistRole.Id);
+            var userRole = new UserRole(user.Id, assignedRole.Id);
             await _dbContext.UserRoles.AddAsync(userRole);
             await _dbContext.SaveChangesAsync();
 
@@ -163,7 +166,7 @@ namespace Infrastructure.Services
                 Type       = "create",
                 Entity     = "User",
                 RecordId   = user.Id,
-                Message    = $"New user {request.FirstName} {request.LastName} registered",
+                Message    = $"New user {request.FirstName} {request.LastName} registered as {assignedRole.RoleName.Value}",
                 OccurredAt = DateTime.UtcNow
             });
 
