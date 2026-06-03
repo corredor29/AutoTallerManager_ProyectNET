@@ -13,13 +13,13 @@ namespace Infrastructure.Services;
 
 public sealed class PartService : IPartService
 {
-    private readonly IPartRepository _partRepository;
+    private readonly IPartRepository    _partRepository;
     private readonly AutoTallerDbContext _dbContext;
 
     public PartService(IPartRepository partRepository, AutoTallerDbContext dbContext)
     {
         _partRepository = partRepository;
-        _dbContext = dbContext;
+        _dbContext      = dbContext;
     }
 
     public async Task<PagedResult<PartDto>> GetAllPagedAsync(
@@ -67,10 +67,7 @@ public sealed class PartService : IPartService
     public async Task<bool> UpdateAsync(int id, UpdatePartRequest request)
     {
         var part = await _partRepository.GetByIdAsync(id);
-        if (part is null)
-        {
-            return false;
-        }
+        if (part is null) return false;
 
         await EnsureRelatedEntitiesExistAsync(request.PartCategoryId, request.UnitId);
         await EnsureCodeIsUniqueAsync(request.Code, id);
@@ -93,16 +90,11 @@ public sealed class PartService : IPartService
     public async Task<bool> DeleteAsync(int id)
     {
         var part = await _partRepository.GetByIdAsync(id);
-        if (part is null)
-        {
-            return false;
-        }
+        if (part is null) return false;
 
         if (await _dbContext.QuotationDetails.AnyAsync(x => x.PartId == id) ||
             await _dbContext.ServiceOrderParts.AnyAsync(x => x.PartId == id))
-        {
             throw new InvalidOperationException($"Part {id} is being used and cannot be deleted.");
-        }
 
         _partRepository.Remove(part);
         await _dbContext.SaveChangesAsync();
@@ -112,45 +104,39 @@ public sealed class PartService : IPartService
     private async Task EnsureRelatedEntitiesExistAsync(int partCategoryId, int? unitId)
     {
         if (!await _dbContext.PartCategories.AnyAsync(x => x.Id == partCategoryId))
-        {
             throw new ArgumentException($"Part category {partCategoryId} does not exist.");
-        }
 
         if (unitId.HasValue && !await _dbContext.MeasurementUnits.AnyAsync(x => x.Id == unitId.Value))
-        {
             throw new ArgumentException($"Measurement unit {unitId.Value} does not exist.");
-        }
     }
 
     private async Task EnsureCodeIsUniqueAsync(string code, int? excludeId = null)
     {
         var normalizedCode = code.Trim().ToUpper();
-        var exists = await _dbContext.Parts.AnyAsync(x =>
+
+        // ── Fix: ToListAsync + filtro en memoria ───────
+        var all = await _dbContext.Parts.ToListAsync();
+        var exists = all.Any(x =>
             x.Code.Value.ToUpper() == normalizedCode &&
             (!excludeId.HasValue || x.Id != excludeId.Value));
 
         if (exists)
-        {
             throw new InvalidOperationException($"Part code '{code}' already exists.");
-        }
     }
 
-    private static PartDto MapToDto(Part part)
+    private static PartDto MapToDto(Part part) => new()
     {
-        return new PartDto
-        {
-            Id = part.Id,
-            PartCategoryId = part.PartCategoryId,
-            PartCategoryName = part.Category.Name.Value,
-            UnitId = part.UnitId,
-            UnitName = part.Unit?.Name.Value,
-            UnitAbbreviation = part.Unit?.Abbreviation.Value,
-            Code = part.Code.Value,
-            Description = part.Description.Value,
-            Stock = part.Stock.Value,
-            MinStock = part.MinStock.Value,
-            UnitPrice = part.UnitPrice.Value,
-            IsActive = part.IsActive
-        };
-    }
+        Id               = part.Id,
+        PartCategoryId   = part.PartCategoryId,
+        PartCategoryName = part.Category?.Name.Value   ?? string.Empty,
+        UnitId           = part.UnitId,
+        UnitName         = part.Unit?.Name.Value,
+        UnitAbbreviation = part.Unit?.Abbreviation.Value,
+        Code             = part.Code?.Value             ?? string.Empty,
+        Description      = part.Description?.Value      ?? string.Empty,
+        Stock            = part.Stock?.Value            ?? 0,
+        MinStock         = part.MinStock?.Value         ?? 0,
+        UnitPrice        = part.UnitPrice?.Value        ?? 0,
+        IsActive         = part.IsActive
+    };
 }
