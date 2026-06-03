@@ -21,7 +21,7 @@ public sealed class InvoiceService : IInvoiceService
     public InvoiceService(IInvoiceRepository invoiceRepository, AutoTallerDbContext dbContext)
     {
         _invoiceRepository = invoiceRepository;
-        _dbContext = dbContext;
+        _dbContext         = dbContext;
     }
 
     public async Task<PagedResult<InvoiceDto>> GetAllPagedAsync(
@@ -56,8 +56,8 @@ public sealed class InvoiceService : IInvoiceService
             .ToListAsync();
 
         var partsTotal = serviceOrderParts.Sum(x => x.Quantity.Value * x.AppliedUnitPrice.Value);
-        var subtotal = request.LaborCost + partsTotal;
-        var total = subtotal + request.Tax;
+        var subtotal   = request.LaborCost + partsTotal;
+        var total      = subtotal + request.Tax;
 
         var invoice = new Invoice(
             request.ServiceOrderId,
@@ -73,12 +73,12 @@ public sealed class InvoiceService : IInvoiceService
 
         if (serviceOrderParts.Count > 0)
         {
-            var details = serviceOrderParts.Select(serviceOrderPart =>
+            var details = serviceOrderParts.Select(sp =>
                 new InvoiceDetail(
                     invoice.Id,
-                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailDescription(serviceOrderPart.Part.Description.Value),
-                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailQuantity(serviceOrderPart.Quantity.Value),
-                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailUnitPrice(serviceOrderPart.AppliedUnitPrice.Value)))
+                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailDescription(sp.Part.Description.Value),
+                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailQuantity(sp.Quantity.Value),
+                    new Domain.ValueObject.Invoices.InvoiceDetail.InvoiceDetailUnitPrice(sp.AppliedUnitPrice.Value)))
                 .ToArray();
 
             await _dbContext.InvoiceDetails.AddRangeAsync(details);
@@ -94,17 +94,14 @@ public sealed class InvoiceService : IInvoiceService
     public async Task<bool> UpdateAsync(int id, UpdateInvoiceRequest request)
     {
         var invoice = await _invoiceRepository.GetByIdAsync(id);
-        if (invoice is null)
-        {
-            return false;
-        }
+        if (invoice is null) return false;
 
         var detailsTotal = await _dbContext.InvoiceDetails
             .Where(x => x.InvoiceId == id)
             .SumAsync(x => x.Quantity.Value * x.UnitPrice.Value);
 
         var subtotal = request.LaborCost + detailsTotal;
-        var total = subtotal + request.Tax;
+        var total    = subtotal + request.Tax;
 
         invoice.Update(
             new InvoiceLaborCost(request.LaborCost),
@@ -121,95 +118,97 @@ public sealed class InvoiceService : IInvoiceService
     public async Task<bool> DeleteAsync(int id)
     {
         var invoice = await _invoiceRepository.GetByIdAsync(id);
-        if (invoice is null)
-        {
-            return false;
-        }
+        if (invoice is null) return false;
 
         if (await _dbContext.InvoiceDetails.AnyAsync(x => x.InvoiceId == id))
-        {
             throw new InvalidOperationException($"Invoice {id} has details and cannot be deleted.");
-        }
 
         _invoiceRepository.Remove(invoice);
         await _dbContext.SaveChangesAsync();
         return true;
     }
 
+    // ── Helpers ────────────────────────────────────
     private async Task EnsureRelatedEntitiesExistAsync(int serviceOrderId, int? quotationId)
     {
-        var serviceOrderStatusName = await _dbContext.ServiceOrders
-            .Where(x => x.Id == serviceOrderId)
-            .Select(x => x.OrderStatus.Name.Value.ToLower())
-            .FirstOrDefaultAsync();
+        // ── Fix: ToListAsync + filtro en memoria ───────
+        var allOrders    = await _dbContext.ServiceOrders.Include(x => x.OrderStatus).ToListAsync();
+        var serviceOrder = allOrders.FirstOrDefault(x => x.Id == serviceOrderId);
 
-        if (serviceOrderStatusName is null)
-        {
+        if (serviceOrder is null)
             throw new ArgumentException($"Service order {serviceOrderId} does not exist.");
-        }
 
-        if (!BillableStatuses.Contains(serviceOrderStatusName))
-        {
+        var statusName = serviceOrder.OrderStatus?.Name.Value.ToLower() ?? string.Empty;
+        if (!BillableStatuses.Contains(statusName))
             throw new InvalidOperationException($"Service order {serviceOrderId} is not ready to be invoiced.");
-        }
 
         if (quotationId.HasValue && !await _dbContext.Quotations.AnyAsync(x => x.Id == quotationId.Value))
-        {
             throw new ArgumentException($"Quotation {quotationId.Value} does not exist.");
-        }
 
         if (quotationId.HasValue)
         {
-            var quotationBelongsToOrder = await _dbContext.Quotations.AnyAsync(x =>
-                x.Id == quotationId.Value &&
-                x.ServiceOrderId == serviceOrderId);
+            var belongs = await _dbContext.Quotations.AnyAsync(x =>
+                x.Id == quotationId.Value && x.ServiceOrderId == serviceOrderId);
 
-            if (!quotationBelongsToOrder)
-            {
+            if (!belongs)
                 throw new InvalidOperationException(
                     $"Quotation {quotationId.Value} does not belong to service order {serviceOrderId}.");
-            }
         }
     }
 
     private async Task EnsureUniqueServiceOrderInvoiceAsync(int serviceOrderId)
     {
         if (await _dbContext.Invoices.AnyAsync(x => x.ServiceOrderId == serviceOrderId))
-        {
             throw new InvalidOperationException($"Service order {serviceOrderId} already has an invoice.");
-        }
     }
 
     private async Task EnsureQuotationAvailabilityAsync(int? quotationId)
     {
-        if (!quotationId.HasValue)
-        {
-            return;
-        }
+        if (!quotationId.HasValue) return;
 
         if (await _dbContext.Invoices.AnyAsync(x => x.QuotationId == quotationId.Value))
-        {
-            throw new InvalidOperationException($"Quotation {quotationId.Value} is already linked to another invoice.");
-        }
+            throw new InvalidOperationException(
+                $"Quotation {quotationId.Value} is already linked to another invoice.");
     }
 
     private static InvoiceDto MapToDto(Invoice invoice)
     {
+        var customerName = string.Empty;
+        int? customerId  = null;
+
+        if (invoice.ServiceOrder?.Appointment?.Customer?.Person is not null)
+        {
+            var p = invoice.ServiceOrder.Appointment.Customer.Person;
+            customerName = $"{p.FirstName.Value} {p.LastName.Value}".Trim();
+            customerId   = invoice.ServiceOrder.Appointment.CustomerId;
+        }
+
+        if (string.IsNullOrEmpty(customerName))
+        {
+            var owner = invoice.ServiceOrder?.Vehicle?.Ownerships?
+                .FirstOrDefault(o => o.DateRange.EndDate == null);
+
+            if (owner?.Customer?.Person is not null)
+            {
+                var p = owner.Customer.Person;
+                customerName = $"{p.FirstName.Value} {p.LastName.Value}".Trim();
+                customerId   = owner.CustomerId;
+            }
+        }
+
         return new InvoiceDto
         {
-            Id = invoice.Id,
-            ServiceOrderId = invoice.ServiceOrderId,
-            CustomerId = invoice.ServiceOrder?.Appointment?.CustomerId,
-            CustomerName = invoice.ServiceOrder?.Appointment?.Customer?.Person is null
-                ? string.Empty
-                : $"{invoice.ServiceOrder.Appointment.Customer.Person.FirstName.Value} {invoice.ServiceOrder.Appointment.Customer.Person.LastName.Value}".Trim(),
-            VehicleVin = invoice.ServiceOrder?.Vehicle?.VIN.Value ?? string.Empty,
-            QuotationId = invoice.QuotationId,
-            IssuedAt = invoice.IssuedAt,
-            LaborCost = invoice.LaborCost.Value,
-            Subtotal = invoice.Subtotal.Value,
-            Tax = invoice.Tax.Value,
-            Total = invoice.Total.Value,
+            Id                   = invoice.Id,
+            ServiceOrderId       = invoice.ServiceOrderId,
+            CustomerId           = customerId,
+            CustomerName         = customerName,
+            VehicleVin           = invoice.ServiceOrder?.Vehicle?.VIN.Value ?? string.Empty,
+            QuotationId          = invoice.QuotationId,
+            IssuedAt             = invoice.IssuedAt,
+            LaborCost            = invoice.LaborCost?.Value ?? 0,
+            Subtotal             = invoice.Subtotal?.Value  ?? 0,
+            Tax                  = invoice.Tax?.Value       ?? 0,
+            Total                = invoice.Total?.Value     ?? 0,
             DiagnosisOnlyCharged = invoice.DiagnosisOnlyCharged
         };
     }

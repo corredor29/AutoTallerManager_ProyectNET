@@ -14,12 +14,12 @@ namespace Infrastructure.Services;
 public sealed class QuotationService : IQuotationService
 {
     private readonly IQuotationRepository _quotationRepository;
-    private readonly AutoTallerDbContext _dbContext;
+    private readonly AutoTallerDbContext   _dbContext;
 
     public QuotationService(IQuotationRepository quotationRepository, AutoTallerDbContext dbContext)
     {
         _quotationRepository = quotationRepository;
-        _dbContext = dbContext;
+        _dbContext           = dbContext;
     }
 
     public async Task<IEnumerable<QuotationDto>> GetAllAsync()
@@ -62,10 +62,7 @@ public sealed class QuotationService : IQuotationService
     public async Task<bool> UpdateAsync(int id, UpdateQuotationRequest request)
     {
         var quotation = await _quotationRepository.GetByIdAsync(id);
-        if (quotation is null)
-        {
-            return false;
-        }
+        if (quotation is null) return false;
 
         quotation.Update(
             new LaborCost(request.LaborCost),
@@ -81,20 +78,16 @@ public sealed class QuotationService : IQuotationService
     public async Task<bool> ChangeStatusAsync(int id, ChangeQuotationStatusRequest request)
     {
         var quotation = await _quotationRepository.GetByIdAsync(id);
-        if (quotation is null)
-        {
-            return false;
-        }
+        if (quotation is null) return false;
 
-        var statusName = await _dbContext.QuotationStatuses
-            .Where(x => x.Id == request.QuotationStatusId)
-            .Select(x => x.Name.Value)
-            .FirstOrDefaultAsync();
+        // ── Fix: ToListAsync + filtro en memoria ───────
+        var allStatuses = await _dbContext.QuotationStatuses.ToListAsync();
+        var status      = allStatuses.FirstOrDefault(x => x.Id == request.QuotationStatusId);
 
-        if (string.IsNullOrWhiteSpace(statusName))
-        {
+        if (status is null)
             throw new ArgumentException($"Quotation status {request.QuotationStatusId} does not exist.");
-        }
+
+        var statusName = status.Name.Value;
 
         quotation.ChangeStatus(request.QuotationStatusId);
 
@@ -116,10 +109,7 @@ public sealed class QuotationService : IQuotationService
     public async Task<bool> DeleteAsync(int id)
     {
         var quotation = await _quotationRepository.GetByIdAsync(id);
-        if (quotation is null)
-        {
-            return false;
-        }
+        if (quotation is null) return false;
 
         _quotationRepository.Remove(quotation);
         await _dbContext.SaveChangesAsync();
@@ -133,7 +123,7 @@ public sealed class QuotationService : IQuotationService
 
         if (alreadyHasInvoice) return;
 
-        var diagnosticCost = quotation.LaborCost.Value;
+        var diagnosticCost = quotation.LaborCost?.Value ?? 0;
 
         var invoice = new Invoice(
             quotation.ServiceOrderId,
@@ -147,22 +137,17 @@ public sealed class QuotationService : IQuotationService
         await _dbContext.Invoices.AddAsync(invoice);
     }
 
-    private async Task EnsureRelatedEntitiesExistAsync(int serviceOrderId, int createdByUserId, int quotationStatusId)
+    private async Task EnsureRelatedEntitiesExistAsync(
+        int serviceOrderId, int createdByUserId, int quotationStatusId)
     {
         if (!await _dbContext.ServiceOrders.AnyAsync(x => x.Id == serviceOrderId))
-        {
             throw new ArgumentException($"Service order {serviceOrderId} does not exist.");
-        }
 
         if (!await _dbContext.Users.AnyAsync(x => x.Id == createdByUserId && x.IsActive))
-        {
             throw new ArgumentException($"User {createdByUserId} does not exist or is inactive.");
-        }
 
         if (!await _dbContext.QuotationStatuses.AnyAsync(x => x.Id == quotationStatusId))
-        {
             throw new ArgumentException($"Quotation status {quotationStatusId} does not exist.");
-        }
     }
 
     private static QuotationDto MapToDto(Quotation quotation)
@@ -173,19 +158,19 @@ public sealed class QuotationService : IQuotationService
 
         return new QuotationDto
         {
-            Id = quotation.Id,
-            ServiceOrderId = quotation.ServiceOrderId,
-            CreatedByUserId = quotation.CreatedByUserId,
-            CreatedByUserName = createdByUserName,
-            QuotationStatusId = quotation.QuotationStatusId,
+            Id                  = quotation.Id,
+            ServiceOrderId      = quotation.ServiceOrderId,
+            CreatedByUserId     = quotation.CreatedByUserId,
+            CreatedByUserName   = createdByUserName,
+            QuotationStatusId   = quotation.QuotationStatusId,
             QuotationStatusName = quotation.QuotationStatus?.Name.Value ?? string.Empty,
-            CreatedAt = quotation.CreatedAt,
-            RespondedAt = quotation.RespondedAt,
-            LaborCost = quotation.LaborCost.Value,
-            Subtotal = quotation.Subtotal.Value,
-            Total = quotation.Total.Value,
-            RejectionReason = quotation.RejectionReason.Value,
-            Notes = quotation.Notes.Value
+            CreatedAt           = quotation.CreatedAt,
+            RespondedAt         = quotation.RespondedAt,
+            LaborCost           = quotation.LaborCost?.Value        ?? 0,
+            Subtotal            = quotation.Subtotal?.Value         ?? 0,
+            Total               = quotation.Total?.Value            ?? 0,
+            RejectionReason     = quotation.RejectionReason?.Value,
+            Notes               = quotation.Notes?.Value
         };
     }
 }

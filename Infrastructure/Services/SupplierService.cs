@@ -12,12 +12,12 @@ namespace Infrastructure.Services;
 public sealed class SupplierService : ISupplierService
 {
     private readonly ISupplierRepository _supplierRepository;
-    private readonly AutoTallerDbContext _dbContext;
+    private readonly AutoTallerDbContext  _dbContext;
 
     public SupplierService(ISupplierRepository supplierRepository, AutoTallerDbContext dbContext)
     {
         _supplierRepository = supplierRepository;
-        _dbContext = dbContext;
+        _dbContext          = dbContext;
     }
 
     public async Task<IEnumerable<SupplierDto>> GetAllAsync()
@@ -53,10 +53,7 @@ public sealed class SupplierService : ISupplierService
     public async Task<bool> UpdateAsync(int id, UpdateSupplierRequest request)
     {
         var supplier = await _supplierRepository.GetByIdAsync(id);
-        if (supplier is null)
-        {
-            return false;
-        }
+        if (supplier is null) return false;
 
         await EnsureTaxIdIsUniqueAsync(request.TaxId, id);
 
@@ -69,13 +66,9 @@ public sealed class SupplierService : ISupplierService
             new SupplierAddress(request.Address));
 
         if (request.IsActive)
-        {
             supplier.Activate();
-        }
         else
-        {
             supplier.Deactivate();
-        }
 
         _supplierRepository.Update(supplier);
         await _dbContext.SaveChangesAsync();
@@ -85,15 +78,10 @@ public sealed class SupplierService : ISupplierService
     public async Task<bool> DeleteAsync(int id)
     {
         var supplier = await _supplierRepository.GetByIdAsync(id);
-        if (supplier is null)
-        {
-            return false;
-        }
+        if (supplier is null) return false;
 
         if (await _dbContext.PartSuppliers.AnyAsync(x => x.SupplierId == id))
-        {
             throw new InvalidOperationException($"Supplier {id} is being used and cannot be deleted.");
-        }
 
         _supplierRepository.Remove(supplier);
         await _dbContext.SaveChangesAsync();
@@ -102,35 +90,30 @@ public sealed class SupplierService : ISupplierService
 
     private async Task EnsureTaxIdIsUniqueAsync(string? taxId, int? excludeId = null)
     {
-        if (string.IsNullOrWhiteSpace(taxId))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(taxId)) return;
 
         var normalizedTaxId = taxId.Trim().ToLower();
-        var exists = await _dbContext.Suppliers.AnyAsync(x =>
-            x.TaxId.Value != null &&
+
+        // ── Fix: ToListAsync + filtro en memoria ───────
+        var all = await _dbContext.Suppliers.ToListAsync();
+        var exists = all.Any(x =>
+            x.TaxId?.Value != null &&
             x.TaxId.Value.ToLower() == normalizedTaxId &&
             (!excludeId.HasValue || x.Id != excludeId.Value));
 
         if (exists)
-        {
             throw new InvalidOperationException($"Supplier tax ID '{taxId}' already exists.");
-        }
     }
 
-    private static SupplierDto MapToDto(Supplier supplier)
+    private static SupplierDto MapToDto(Supplier supplier) => new()
     {
-        return new SupplierDto
-        {
-            Id = supplier.Id,
-            CompanyName = supplier.CompanyName.Value,
-            TaxId = supplier.TaxId.Value,
-            ContactName = supplier.ContactName.Value,
-            Phone = supplier.Phone.Value,
-            Email = supplier.Email.Value,
-            Address = supplier.Address.Value,
-            IsActive = supplier.IsActive
-        };
-    }
+        Id          = supplier.Id,
+        CompanyName = supplier.CompanyName?.Value  ?? string.Empty,
+        TaxId       = supplier.TaxId?.Value,
+        ContactName = supplier.ContactName?.Value,
+        Phone       = supplier.Phone?.Value,
+        Email       = supplier.Email?.Value,
+        Address     = supplier.Address?.Value,
+        IsActive    = supplier.IsActive
+    };
 }
