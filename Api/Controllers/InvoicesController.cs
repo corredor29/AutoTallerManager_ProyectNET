@@ -10,7 +10,8 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = AppRoles.AdminOrMechanic)]
+[Authorize(Roles = AppRoles.Staff)]
+// Controlador que expone los endpoints principales del modulo Invoices.
 public sealed class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
@@ -43,6 +44,7 @@ public sealed class InvoicesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrReceptionist)]
     public async Task<IActionResult> Create([FromBody] CreateInvoiceRequest request)
     {
         var invoice = await _invoiceService.CreateAsync(request);
@@ -50,6 +52,7 @@ public sealed class InvoicesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.AdminOrReceptionist)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateInvoiceRequest request)
     {
         var updated = await _invoiceService.UpdateAsync(id, request);
