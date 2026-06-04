@@ -4,6 +4,7 @@ using System.Text;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
 using Application.DTOs.Auth;
+using Application.DTOs.Notifications;
 using Application.Requests.Auth;
 using Domain.Entities.Persons;
 using Domain.Entities.Users;
@@ -11,53 +12,271 @@ using Domain.ValueObject.Persons.EmailDomain;
 using Domain.ValueObject.Persons.Person;
 using Domain.ValueObject.Persons.PersonEmail;
 using Domain.ValueObject.Users.User;
+using Google.Apis.Auth;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Infrastructure.Services
 {
-
     public sealed class AuthService : IAuthService
     {
-        private readonly IUserRepository    _userRepository;
-        private readonly JwtOptions         _jwtOptions;
-        private readonly AutoTallerDbContext _dbContext;
+        // Repositorio especializado para consultar usuarios con sus relaciones cargadas.
+        private readonly IUserRepository             _userRepository;
+        // Configuración JWT usada para firmar y expirar tokens.
+        private readonly JwtOptions                  _jwtOptions;
+        // DbContext requerido para crear registros relacionados durante el registro.
+        private readonly AutoTallerDbContext          _dbContext;
+        // Hub usado para enviar notificaciones en tiempo real al frontend.
+        private readonly IHubContext<NotificationHub> _hub;
+        // Client ID de Google usado para validar el ID token recibido del frontend.
+        private readonly string                      _googleClientId;
 
         public AuthService(
             IUserRepository userRepository,
             IOptions<JwtOptions> jwtOptions,
-            AutoTallerDbContext dbContext)
+            AutoTallerDbContext dbContext,
+            IHubContext<NotificationHub> hub,
+            IConfiguration configuration)
         {
             _userRepository = userRepository;
             _jwtOptions     = jwtOptions.Value;
             _dbContext      = dbContext;
+            _hub            = hub;
+            _googleClientId = configuration["Google:ClientId"]!;
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginRequest request)
         {
+            // Normaliza el email y lo divide para buscarlo según el modelo usuario/dominio.
             var emailParts = request.Email
                 .Trim()
                 .ToLowerInvariant()
                 .Split('@', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+            // Si el correo no tiene el formato esperado, se rechaza la autenticación.
             if (emailParts.Length != 2)
-            {
                 throw new UnauthorizedAccessException("Invalid credentials.");
-            }
 
+            // Busca el usuario por su correo principal y valida que esté activo.
             var user = await _userRepository.GetByPrimaryEmailAsync(emailParts[0], emailParts[1]);
             if (user is null || !user.IsActive)
-            {
                 throw new UnauthorizedAccessException("Invalid credentials.");
-            }
 
+            // La contraseña enviada se compara contra el hash almacenado.
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash.Value))
-            {
                 throw new UnauthorizedAccessException("Invalid credentials.");
+
+            // Se recopilan los roles para incluirlos en autorización y respuesta.
+            var roles = user.UserRoles
+                .Select(x => x.Role.RoleName.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            // Calcula el vencimiento y prepara las utilidades del token.
+            var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtOptions.ExpirationMinutes);
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var securityKey  = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
+
+            // Claims base que identificarán al usuario autenticado dentro del sistema.
+            var claims = new List<Claim>
+            {
+                new(JwtRegisteredClaimNames.Sub,        user.Id.ToString()),
+                new(JwtRegisteredClaimNames.UniqueName, user.Id.ToString()),
+                new("personId",                         user.PersonId.ToString()),
+                new(JwtRegisteredClaimNames.GivenName,  user.Person.FirstName.Value),
+                new(JwtRegisteredClaimNames.FamilyName, user.Person.LastName.Value)
+            };
+
+            // Cada rol también viaja como claim para que la autorización por roles funcione.
+            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+            // Aquí se define exactamente cómo quedará construido el JWT.
+            var descriptor = new SecurityTokenDescriptor
+            {
+                Subject            = new ClaimsIdentity(claims),
+                Expires            = expiresAtUtc,
+                Issuer             = _jwtOptions.Issuer,
+                Audience           = _jwtOptions.Audience,
+                SigningCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature)
+            };
+
+            // Se genera el token y un nombre amigable para devolver al cliente.
+            var token    = tokenHandler.CreateToken(descriptor);
+            var fullName = $"{user.Person.FirstName.Value} {user.Person.LastName.Value}".Trim();
+
+            // Notifica a todos los clientes conectados que alguien inició sesión.
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "login",
+                Entity     = "User",
+                RecordId   = user.Id,
+                Message    = $"{fullName} logged in",
+                OccurredAt = DateTime.UtcNow
+            });
+
+            return new AuthResponseDto
+            {
+                Token        = tokenHandler.WriteToken(token),
+                ExpiresAtUtc = expiresAtUtc,
+                UserId       = user.Id,
+                PersonId     = user.PersonId,
+                FullName     = fullName,
+                Roles        = roles
+            };
+        }
+
+        public async Task<AuthResponseDto> RegisterAsync(RegisterRequest request)
+        {
+            // Divide el correo para persistirlo siguiendo el modelo del dominio.
+            var emailParts  = request.Email.Trim().ToLowerInvariant()
+                                .Split('@', StringSplitOptions.RemoveEmptyEntries);
+            var emailUser   = emailParts[0];
+            var emailDomain = emailParts[1];
+
+            // Intenta reutilizar un dominio existente antes de crear uno nuevo.
+            var allDomains   = await _dbContext.EmailDomains.ToListAsync();
+            var domainEntity = allDomains.FirstOrDefault(d => d.Domain.Value == emailDomain);
+
+            if (domainEntity is null)
+            {
+                // Si el dominio no existe todavía, se crea una vez y queda disponible.
+                domainEntity = new EmailDomain(new EmailDomainValue(emailDomain));
+                await _dbContext.EmailDomains.AddAsync(domainEntity);
+                await _dbContext.SaveChangesAsync();
             }
 
+            // Evita registrar dos veces el mismo correo.
+            var allEmails   = await _dbContext.PersonEmails.ToListAsync();
+            var emailExists = allEmails.Any(e =>
+                e.EmailUser.Value == emailUser && e.EmailDomainId == domainEntity.Id);
+
+            if (emailExists)
+                throw new InvalidOperationException("Email already registered.");
+
+            // La persona se crea primero porque el usuario depende de ese registro.
+            var person = new Person(
+                new PersonFirstName(request.FirstName),
+                new PersonLastName(request.LastName));
+
+            await _dbContext.Persons.AddAsync(person);
+            await _dbContext.SaveChangesAsync();
+
+            // Este registro marca cuál es el email asociado a la persona.
+            var personEmail = new PersonEmail(
+                person.Id, domainEntity.Id, new EmailUser(emailUser), true);
+
+            await _dbContext.PersonEmails.AddAsync(personEmail);
+
+            // La contraseña se almacena como hash, nunca en texto plano.
+            var passwordHash = new PasswordHash(BCrypt.Net.BCrypt.HashPassword(request.Password));
+            var user         = new User(person.Id, passwordHash);
+            await _dbContext.Users.AddAsync(user);
+            await _dbContext.SaveChangesAsync();
+
+            // ── Asignar rol según request, fallback a Receptionist ──
+            var allRoles     = await _dbContext.Roles.ToListAsync();
+            // Si el cliente no envía rol, se asigna Receptionist como valor por defecto.
+            var roleName     = string.IsNullOrWhiteSpace(request.Role) ? "Receptionist" : request.Role.Trim();
+            var assignedRole = allRoles.FirstOrDefault(r => r.RoleName.Value == roleName)
+                ?? allRoles.FirstOrDefault(r => r.RoleName.Value == "Receptionist")
+                ?? throw new InvalidOperationException("Role not found.");
+
+            // Guarda la relación entre el nuevo usuario y su rol.
+            var userRole = new UserRole(user.Id, assignedRole.Id);
+            await _dbContext.UserRoles.AddAsync(userRole);
+            await _dbContext.SaveChangesAsync();
+
+            // Publica una notificación para que el frontend refleje el nuevo registro.
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "create",
+                Entity     = "User",
+                RecordId   = user.Id,
+                Message    = $"New user {request.FirstName} {request.LastName} registered as {assignedRole.RoleName.Value}",
+                OccurredAt = DateTime.UtcNow
+            });
+
+            // Reutiliza el flujo de login para devolver el token listo al usuario nuevo.
+            return await LoginAsync(new LoginRequest
+            {
+                Email    = request.Email,
+                Password = request.Password
+            });
+        }
+
+        public async Task<AuthResponseDto> LoginWithGoogleAsync(GoogleLoginRequest request)
+        {
+            // Divide el correo de Google para buscarlo con el modelo usuario/dominio.
+            var emailParts  = request.Email.Trim().ToLowerInvariant()
+                                .Split('@', StringSplitOptions.RemoveEmptyEntries);
+            var emailUser   = emailParts[0];
+            var emailDomain = emailParts[1];
+
+            // Verifica si el usuario ya existe en el sistema por su correo de Google.
+            var user = await _userRepository.GetByPrimaryEmailAsync(emailUser, emailDomain);
+
+            if (user is null)
+            {
+                // Si es la primera vez que entra con Google, se crea su cuenta automáticamente.
+                var allDomains   = await _dbContext.EmailDomains.ToListAsync();
+                var domainEntity = allDomains.FirstOrDefault(d => d.Domain.Value == emailDomain);
+
+                if (domainEntity is null)
+                {
+                    // El dominio de Google se registra si no existía previamente.
+                    domainEntity = new EmailDomain(new EmailDomainValue(emailDomain));
+                    await _dbContext.EmailDomains.AddAsync(domainEntity);
+                    await _dbContext.SaveChangesAsync();
+                }
+
+                // La persona se crea con el nombre que devuelve Google.
+                var person = new Person(
+                    new PersonFirstName(request.FirstName),
+                    new PersonLastName(request.LastName));
+
+                await _dbContext.Persons.AddAsync(person);
+                await _dbContext.SaveChangesAsync();
+
+                var personEmail = new PersonEmail(
+                    person.Id, domainEntity.Id, new EmailUser(emailUser), true);
+                await _dbContext.PersonEmails.AddAsync(personEmail);
+
+                // La contraseña aleatoria es necesaria por el modelo pero nunca se usa
+                // porque el usuario siempre se autenticará a través de Google.
+                var passwordHash = new PasswordHash(BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()));
+                user = new User(person.Id, passwordHash);
+                await _dbContext.Users.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+
+                // Los usuarios de Google reciben Receptionist por defecto.
+                var allRoles         = await _dbContext.Roles.ToListAsync();
+                var receptionistRole = allRoles.FirstOrDefault(r => r.RoleName.Value == "Receptionist")
+                    ?? throw new InvalidOperationException("Receptionist role not found.");
+
+                await _dbContext.UserRoles.AddAsync(new UserRole(user.Id, receptionistRole.Id));
+                await _dbContext.SaveChangesAsync();
+
+                // Informa al sistema que se registró un usuario nuevo vía Google.
+                await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+                {
+                    Type       = "create",
+                    Entity     = "User",
+                    RecordId   = user.Id,
+                    Message    = $"New user {request.FirstName} {request.LastName} registered via Google",
+                    OccurredAt = DateTime.UtcNow
+                });
+            }
+
+            // Si la cuenta está desactivada, se bloquea el acceso aunque Google lo valide.
+            if (!user.IsActive)
+                throw new UnauthorizedAccessException("Your account is inactive.");
+
+            // Genera el JWT con los mismos claims que el login normal.
             var roles = user.UserRoles
                 .Select(x => x.Role.RoleName.Value)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -65,14 +284,14 @@ namespace Infrastructure.Services
 
             var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtOptions.ExpirationMinutes);
             var tokenHandler = new JwtSecurityTokenHandler();
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
+            var securityKey  = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
 
             var claims = new List<Claim>
             {
-                new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new(JwtRegisteredClaimNames.Sub,        user.Id.ToString()),
                 new(JwtRegisteredClaimNames.UniqueName, user.Id.ToString()),
-                new("personId", user.PersonId.ToString()),
-                new(JwtRegisteredClaimNames.GivenName, user.Person.FirstName.Value),
+                new("personId",                         user.PersonId.ToString()),
+                new(JwtRegisteredClaimNames.GivenName,  user.Person.FirstName.Value),
                 new(JwtRegisteredClaimNames.FamilyName, user.Person.LastName.Value)
             };
 
@@ -80,84 +299,54 @@ namespace Infrastructure.Services
 
             var descriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(claims),
-                Expires = expiresAtUtc,
-                Issuer = _jwtOptions.Issuer,
-                Audience = _jwtOptions.Audience,
+                Subject            = new ClaimsIdentity(claims),
+                Expires            = expiresAtUtc,
+                Issuer             = _jwtOptions.Issuer,
+                Audience           = _jwtOptions.Audience,
                 SigningCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature)
             };
 
-            var token = tokenHandler.CreateToken(descriptor);
+            var token    = tokenHandler.CreateToken(descriptor);
+            var fullName = $"{user.Person.FirstName.Value} {user.Person.LastName.Value}".Trim();
+
+            // Registra el evento de login con Google en el panel de notificaciones.
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "login",
+                Entity     = "User",
+                RecordId   = user.Id,
+                Message    = $"{fullName} logged in via Google",
+                OccurredAt = DateTime.UtcNow
+            });
 
             return new AuthResponseDto
             {
-                Token = tokenHandler.WriteToken(token),
+                Token        = tokenHandler.WriteToken(token),
                 ExpiresAtUtc = expiresAtUtc,
-                UserId = user.Id,
-                PersonId = user.PersonId,
-                FullName = $"{user.Person.FirstName.Value} {user.Person.LastName.Value}".Trim(),
-                Roles = roles
+                UserId       = user.Id,
+                PersonId     = user.PersonId,
+                FullName     = fullName,
+                Roles        = roles
             };
         }
 
-        public async Task<AuthResponseDto> RegisterAsync(RegisterRequest request)
+        public async Task<AuthResponseDto> LoginWithGoogleTokenAsync(string idToken)
         {
-            var emailParts  = request.Email.Trim().ToLowerInvariant()
-                                .Split('@', StringSplitOptions.RemoveEmptyEntries);
-            var emailUser   = emailParts[0];
-            var emailDomain = emailParts[1];
+            // Valida el ID token usando la librería oficial de Google.
+            // Si el token es inválido o expiró, Google lanza una excepción.
+            var payload = await GoogleJsonWebSignature.ValidateAsync(idToken,
+                new GoogleJsonWebSignature.ValidationSettings
+                {
+                    // El audience debe coincidir con el Client ID registrado en Google Console.
+                    Audience = new[] { _googleClientId }
+                });
 
-            var allDomains   = await _dbContext.EmailDomains.ToListAsync();
-            var domainEntity = allDomains.FirstOrDefault(d => d.Domain.Value == emailDomain);
-
-            if (domainEntity is null)
+            // Extrae los datos del perfil del token validado y reutiliza el flujo de Google.
+            return await LoginWithGoogleAsync(new GoogleLoginRequest
             {
-                domainEntity = new EmailDomain(new EmailDomainValue(emailDomain));
-                await _dbContext.EmailDomains.AddAsync(domainEntity);
-                await _dbContext.SaveChangesAsync();
-            }
-
-            var allEmails  = await _dbContext.PersonEmails.ToListAsync();
-            var emailExists = allEmails.Any(e => e.EmailUser.Value == emailUser
-                                            && e.EmailDomainId == domainEntity.Id);
-
-            if (emailExists)
-                throw new InvalidOperationException("Email already registered.");
-
-            var person = new Person(
-                new PersonFirstName(request.FirstName),
-                new PersonLastName(request.LastName)
-            );
-
-            await _dbContext.Persons.AddAsync(person);
-            await _dbContext.SaveChangesAsync();
-
-            var personEmail = new PersonEmail(
-                person.Id,
-                domainEntity.Id,
-                new EmailUser(emailUser),
-                true
-            );
-
-            await _dbContext.PersonEmails.AddAsync(personEmail);
-
-            var passwordHash = new PasswordHash(BCrypt.Net.BCrypt.HashPassword(request.Password));
-            var user = new User(person.Id, passwordHash);
-            await _dbContext.Users.AddAsync(user);
-            await _dbContext.SaveChangesAsync();
-
-            var allRoles = await _dbContext.Roles.ToListAsync();
-            var receptionistRole = allRoles.FirstOrDefault(r => r.RoleName.Value == "Receptionist")
-                ?? throw new InvalidOperationException("Receptionist role not found.");
-
-            var userRole = new UserRole(user.Id, receptionistRole.Id);
-            await _dbContext.UserRoles.AddAsync(userRole);
-            await _dbContext.SaveChangesAsync();
-
-            return await LoginAsync(new LoginRequest
-            {
-                Email    = request.Email,
-                Password = request.Password
+                Email     = payload.Email,
+                FirstName = payload.GivenName  ?? "Google",
+                LastName  = payload.FamilyName ?? "User"
             });
         }
     }
