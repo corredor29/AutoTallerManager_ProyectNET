@@ -8,8 +8,10 @@ namespace Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin")]
+// Controlador que expone los endpoints principales del modulo Users.
 public sealed class UsersController : ControllerBase
 {
+    // Servicio que contiene la logica de negocio usada por este controlador.
     private readonly IUserService _userService;
 
     public UsersController(IUserService userService)
@@ -17,6 +19,7 @@ public sealed class UsersController : ControllerBase
         _userService = userService;
     }
 
+// Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -24,6 +27,7 @@ public sealed class UsersController : ControllerBase
         return Ok(users);
     }
 
+// Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -36,6 +40,7 @@ public sealed class UsersController : ControllerBase
         return Ok(user);
     }
 
+// Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest request)
     {
@@ -43,6 +48,7 @@ public sealed class UsersController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
     }
 
+// Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateUserRequest request)
     {
@@ -55,6 +61,7 @@ public sealed class UsersController : ControllerBase
         return NoContent();
     }
 
+// Activa el usuario para permitir nuevamente su uso en el sistema.
     [HttpPut("{id:int}/activate")]
     public async Task<IActionResult> Activate(int id)
     {
@@ -67,6 +74,7 @@ public sealed class UsersController : ControllerBase
         return NoContent();
     }
 
+// Desactiva el usuario para bloquear su uso sin borrarlo.
     [HttpPut("{id:int}/deactivate")]
     public async Task<IActionResult> Deactivate(int id)
     {
@@ -79,6 +87,7 @@ public sealed class UsersController : ControllerBase
         return NoContent();
     }
 
+// Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

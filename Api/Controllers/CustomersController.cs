@@ -11,8 +11,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
+// Controlador que expone los endpoints principales del modulo Customers.
     public sealed class CustomersController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly ICustomerService _customerService;
 
         public CustomersController(ICustomerService customerService)
@@ -20,6 +22,7 @@ namespace Api.Controllers
             _customerService = customerService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] PaginationParams pagination,
@@ -30,6 +33,7 @@ namespace Api.Controllers
             return Ok(result);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -42,6 +46,7 @@ namespace Api.Controllers
             return Ok(customer);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request)
@@ -50,6 +55,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
         }
 
+    // Registra un cliente y su vehiculo en una sola operacion.
         [HttpPost("register-with-vehicle")]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> RegisterWithVehicle([FromBody] RegisterCustomerWithVehicleRequest request)
@@ -58,6 +64,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = result.Customer.Id }, result);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerRequest request)
@@ -71,6 +78,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)

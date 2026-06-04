@@ -6,8 +6,10 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Controlador que expone los endpoints principales del modulo PurchaseOrders.
 public sealed class PurchaseOrdersController : ControllerBase
 {
+    // Servicio que contiene la logica de negocio usada por este controlador.
     private readonly IPurchaseOrderService _purchaseOrderService;
 
     public PurchaseOrdersController(IPurchaseOrderService purchaseOrderService)
@@ -15,6 +17,7 @@ public sealed class PurchaseOrdersController : ControllerBase
         _purchaseOrderService = purchaseOrderService;
     }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -22,6 +25,7 @@ public sealed class PurchaseOrdersController : ControllerBase
         return Ok(purchaseOrders);
     }
 
+    // Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -34,6 +38,7 @@ public sealed class PurchaseOrdersController : ControllerBase
         return Ok(purchaseOrder);
     }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePurchaseOrderRequest request)
     {
@@ -41,6 +46,7 @@ public sealed class PurchaseOrdersController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = purchaseOrder.Id }, purchaseOrder);
     }
 
+    // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePurchaseOrderRequest request)
     {
@@ -53,6 +59,7 @@ public sealed class PurchaseOrdersController : ControllerBase
         return NoContent();
     }
 
+    // Cambia el estado del registro usando una solicitud especifica.
     [HttpPut("{id:int}/status")]
     public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangePurchaseOrderStatusRequest request)
     {
@@ -65,6 +72,7 @@ public sealed class PurchaseOrdersController : ControllerBase
         return NoContent();
     }
 
+    // Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
