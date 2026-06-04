@@ -13,11 +13,14 @@ using Infrastructure.Services;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class InvoiceServiceTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static InvoiceService CreateService(AutoTallerDbContext db) =>
         new(new InvoiceRepository(db), db);
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterByCustomerId_ReturnsOnlyMatchingInvoices()
     {

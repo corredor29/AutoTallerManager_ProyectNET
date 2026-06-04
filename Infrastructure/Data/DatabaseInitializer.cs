@@ -36,6 +36,7 @@ namespace Infrastructure.Data;
 
 public class DatabaseInitializer
 {
+    // Contexto principal usado para migrar la base y sembrar catalogos iniciales.
     private readonly AutoTallerDbContext _dbContext;
 
     public DatabaseInitializer(AutoTallerDbContext dbContext)
@@ -45,11 +46,13 @@ public class DatabaseInitializer
 
     public async Task InitializeAsync()
     {
+        // En bases relacionales aplica migraciones; en memoria crea el esquema minimo necesario.
         if (_dbContext.Database.IsRelational())
             await _dbContext.Database.MigrateAsync();
         else
             await _dbContext.Database.EnsureCreatedAsync();
 
+        // Cada metodo asegura que un catalogo base exista antes de usar la aplicacion.
         await SeedAppointmentStatusesAsync();
         await SeedOrderStatusesAsync();
         await SeedServiceTypesAsync();
@@ -73,6 +76,7 @@ public class DatabaseInitializer
 
     private async Task SeedAppointmentStatusesAsync()
     {
+        // Evita duplicar catalogos si la base ya fue inicializada antes.
         if (await _dbContext.AppointmentStatuses.AnyAsync()) return;
         var statuses = new[]
         {
@@ -168,6 +172,7 @@ public class DatabaseInitializer
 
     private async Task SeedDefaultAdminAsync()
     {
+        // El admin por defecto garantiza un primer acceso al sistema recien inicializado.
         var adminRole = (await _dbContext.Roles.ToListAsync())
             .FirstOrDefault(x => x.RoleName.Value == "Admin")
             ?? throw new InvalidOperationException("Admin role must exist before seeding the default admin user.");
@@ -185,6 +190,7 @@ public class DatabaseInitializer
         }
         else
         {
+            // Si todavia no existe un admin, crea persona, usuario y relacion con el rol Admin.
             var person = new Person(new PersonFirstName("System"), new PersonLastName("Administrator"));
             await _dbContext.Persons.AddAsync(person);
             await _dbContext.SaveChangesAsync();
@@ -198,14 +204,17 @@ public class DatabaseInitializer
             await _dbContext.SaveChangesAsync();
         }
 
+        // Asegura que el admin tambien tenga un correo principal funcional para login.
         await EnsureDefaultAdminEmailAsync(adminUser.PersonId);
     }
 
     private async Task EnsureDefaultAdminEmailAsync(int personId)
     {
+        // Si ya tiene correo principal no hace falta tocar nada.
         var hasPrimaryEmail = await _dbContext.PersonEmails.AnyAsync(x => x.PersonId == personId && x.IsPrimary);
         if (hasPrimaryEmail) return;
 
+        // Reutiliza o crea el dominio local usado por el usuario administrador del sistema.
         var emailDomain = await _dbContext.EmailDomains
             .FirstOrDefaultAsync(x => x.Domain == new EmailDomainValue("autotaller.local"));
 
@@ -228,6 +237,7 @@ public class DatabaseInitializer
         }
         else
         {
+            // Si el correo ya existe, solo lo vuelve primario para dejar consistente el acceso.
             existingAdminEmail.SetAsPrimary();
             _dbContext.PersonEmails.Update(existingAdminEmail);
         }
@@ -303,6 +313,7 @@ public class DatabaseInitializer
     {
         if (await _dbContext.VehicleModels.AnyAsync()) return;
 
+        // Primero carga las marcas ya sembradas para enlazar correctamente cada modelo.
         var brands = await _dbContext.VehicleBrands.ToListAsync();
         var brandMap = brands.ToDictionary(b => b.BrandName.Value);
         var models = new List<VehicleModel>();

@@ -4,13 +4,16 @@ using Infrastructure.Repositories;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class PartRepositoryTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static PartRepository CreateRepository(AutoTallerDbContext db) =>
         new(db);
 
     // ── GetAllPagedAsync ─────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterBelowMinStock_ReturnsOnlyLowStockParts()
     {
@@ -31,6 +34,7 @@ public sealed class PartRepositoryTests
             .Should().BeEquivalentTo(["LOW-001", "LOW-002"]);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterByCategory_ReturnsOnlyMatchingCategoryParts()
     {
@@ -51,6 +55,7 @@ public sealed class PartRepositoryTests
         result.Items.Should().OnlyContain(p => p.PartCategoryId == catEngine);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_EmptyFilter_ReturnsPaginatedAllParts()
     {
@@ -78,6 +83,7 @@ public sealed class PartRepositoryTests
         page2.HasNextPage.Should().BeFalse();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterIsActive_ReturnsOnlyActiveOrInactiveParts()
     {

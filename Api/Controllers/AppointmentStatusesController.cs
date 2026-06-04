@@ -13,8 +13,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
+// Controlador que expone los endpoints principales del modulo AppointmentStatuses.
     public sealed class AppointmentStatusesController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IAppointmentStatusService _appointmentStatusService;
 
         public AppointmentStatusesController(IAppointmentStatusService appointmentStatusService)
@@ -22,6 +24,7 @@ namespace Api.Controllers
             _appointmentStatusService = appointmentStatusService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -29,6 +32,7 @@ namespace Api.Controllers
             return Ok(statuses);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -39,6 +43,7 @@ namespace Api.Controllers
             return Ok(status);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Create([FromBody] CreateAppointmentStatusRequest request)
@@ -47,6 +52,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = status.Id }, status);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateAppointmentStatusRequest request)
@@ -58,6 +64,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)

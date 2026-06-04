@@ -13,8 +13,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Admin)]
+// Controlador que expone los endpoints principales del modulo PhoneCodes.
     public sealed class PhoneCodesController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IPhoneCodeService _phoneCodeService;
 
         public PhoneCodesController(IPhoneCodeService phoneCodeService)
@@ -22,6 +24,7 @@ namespace Api.Controllers
             _phoneCodeService = phoneCodeService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> GetAll()
@@ -30,6 +33,7 @@ namespace Api.Controllers
             return Ok(phoneCodes);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> GetById(int id)
@@ -41,6 +45,7 @@ namespace Api.Controllers
             return Ok(phoneCode);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreatePhoneCodeRequest request)
         {
@@ -48,6 +53,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = phoneCode.Id }, phoneCode);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdatePhoneCodeRequest request)
         {
@@ -58,6 +64,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {

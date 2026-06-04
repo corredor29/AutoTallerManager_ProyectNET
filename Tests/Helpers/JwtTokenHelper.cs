@@ -11,6 +11,7 @@ internal static class JwtTokenHelper
     private const string Issuer   = "AutoTallerManager.Api";
     private const string Audience = "AutoTallerManager.Client";
 
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     internal static string GenerateToken(int userId = 1, params string[] roles)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Key));

@@ -8,8 +8,10 @@ using Microsoft.AspNetCore.Routing;
 
 namespace AutoTallerManager.Tests.Api;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class ApiResponseFilterTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task OnResultExecutionAsync_WrapsObjectResult_InSuccessEnvelope()
     {
@@ -37,6 +39,7 @@ public sealed class ApiResponseFilterTests
         Assert.NotNull(payload.Data);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task OnResultExecutionAsync_DoesNotWrapProblemDetails()
     {

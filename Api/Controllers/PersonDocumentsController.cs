@@ -13,8 +13,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
+// Controlador que expone los endpoints principales del modulo PersonDocuments.
     public sealed class PersonDocumentsController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IPersonDocumentService _personDocumentService;
 
         public PersonDocumentsController(IPersonDocumentService personDocumentService)
@@ -22,6 +24,7 @@ namespace Api.Controllers
             _personDocumentService = personDocumentService;
         }
 
+    // Obtiene los registros asociados a una persona especifica.
         [HttpGet("person/{personId:int}")]
         public async Task<IActionResult> GetByPersonId(int personId)
         {
@@ -29,6 +32,7 @@ namespace Api.Controllers
             return Ok(documents);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -39,6 +43,7 @@ namespace Api.Controllers
             return Ok(document);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Create([FromBody] CreatePersonDocumentRequest request)
@@ -47,6 +52,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = document.Id }, document);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdatePersonDocumentRequest request)
@@ -58,6 +64,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Marca este registro relacionado como el principal para la persona.
         [HttpPut("{id:int}/primary")]
         [Authorize(Roles = AppRoles.AdminOrReceptionist)]
         public async Task<IActionResult> SetAsPrimary(int id)
@@ -69,6 +76,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)

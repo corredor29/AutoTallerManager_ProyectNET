@@ -6,8 +6,10 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Controlador que expone los endpoints principales del modulo QuotationStatuses.
 public sealed class QuotationStatusesController : ControllerBase
 {
+    // Servicio que contiene la logica de negocio usada por este controlador.
     private readonly IQuotationStatusService _quotationStatusService;
 
     public QuotationStatusesController(IQuotationStatusService quotationStatusService)
@@ -15,6 +17,7 @@ public sealed class QuotationStatusesController : ControllerBase
         _quotationStatusService = quotationStatusService;
     }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -22,6 +25,7 @@ public sealed class QuotationStatusesController : ControllerBase
         return Ok(statuses);
     }
 
+    // Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -34,6 +38,7 @@ public sealed class QuotationStatusesController : ControllerBase
         return Ok(status);
     }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateQuotationStatusRequest request)
     {
@@ -41,6 +46,7 @@ public sealed class QuotationStatusesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = status.Id }, status);
     }
 
+    // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateQuotationStatusRequest request)
     {
@@ -53,6 +59,7 @@ public sealed class QuotationStatusesController : ControllerBase
         return NoContent();
     }
 
+    // Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

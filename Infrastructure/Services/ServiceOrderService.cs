@@ -1,29 +1,37 @@
 using Application.Common.Pagination;
 using Application.Contracts.Repositories;
 using Application.Contracts.Services;
+using Application.DTOs.Notifications;
 using Application.DTOs.ServiceOrders;
 using Application.Filters;
 using Application.Requests.ServiceOrders;
 using Domain.Entities.ServiceOrders;
 using Domain.ValueObject.ServiceOrders.ServiceOrder;
 using Infrastructure.Context;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Infrastructure.Hubs;
 
 namespace Infrastructure.Services;
 
 public sealed class ServiceOrderService : IServiceOrderService
 {
-    private static readonly string[] ClosingStatuses   = ["completed", "cancelled", "canceled"];
-    private static readonly string[] CancelledStatuses = ["cancelled", "canceled"];
+    private static readonly string[] ClosingStatuses           = ["completed", "cancelled", "canceled"];
+    private static readonly string[] CancelledStatuses         = ["cancelled", "canceled"];
     private static readonly string[] ActiveAppointmentStatuses = ["pending", "confirmed"];
 
-    private readonly IServiceOrderRepository _serviceOrderRepository;
-    private readonly AutoTallerDbContext     _dbContext;
+    private readonly IServiceOrderRepository     _serviceOrderRepository;
+    private readonly AutoTallerDbContext          _dbContext;
+    private readonly IHubContext<NotificationHub> _hub;
 
-    public ServiceOrderService(IServiceOrderRepository serviceOrderRepository, AutoTallerDbContext dbContext)
+    public ServiceOrderService(
+        IServiceOrderRepository serviceOrderRepository,
+        AutoTallerDbContext dbContext,
+        IHubContext<NotificationHub> hub)
     {
         _serviceOrderRepository = serviceOrderRepository;
         _dbContext              = dbContext;
+        _hub                    = hub;
     }
 
     public async Task<PagedResult<ServiceOrderDto>> GetAllPagedAsync(
@@ -48,11 +56,8 @@ public sealed class ServiceOrderService : IServiceOrderService
     public async Task<ServiceOrderDto> CreateAsync(CreateServiceOrderRequest request)
     {
         await EnsureRelatedEntitiesExistAsync(
-            request.VehicleId,
-            request.ServiceTypeId,
-            request.MechanicId,
-            request.OrderStatusId,
-            request.AppointmentId);
+            request.VehicleId, request.ServiceTypeId,
+            request.MechanicId, request.OrderStatusId, request.AppointmentId);
 
         if (await _serviceOrderRepository.HasActiveOrderForVehicleAsync(request.VehicleId))
             throw new InvalidOperationException(
@@ -67,20 +72,15 @@ public sealed class ServiceOrderService : IServiceOrderService
         }
 
         await EnsureMechanicAvailabilityAsync(
-            request.MechanicId,
-            DateTime.UtcNow,
-            estimatedDeliveryAt.Value,
-            request.AppointmentId);
+            request.MechanicId, DateTime.UtcNow,
+            estimatedDeliveryAt.Value, request.AppointmentId);
 
         var order = new ServiceOrder(
-            request.VehicleId,
-            request.ServiceTypeId,
-            request.MechanicId,
+            request.VehicleId, request.ServiceTypeId, request.MechanicId,
             request.OrderStatusId,
             new WorkDescription(request.WorkPerformed),
             new ServiceOrderNotes(request.Notes),
-            request.AppointmentId,
-            estimatedDeliveryAt);
+            request.AppointmentId, estimatedDeliveryAt);
 
         if (await ShouldCloseOrderAsync(request.OrderStatusId))
             order.Close();
@@ -90,6 +90,15 @@ public sealed class ServiceOrderService : IServiceOrderService
 
         var createdOrder = await _serviceOrderRepository.GetByIdAsync(order.Id)
             ?? throw new InvalidOperationException("Service order could not be reloaded after creation.");
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "create",
+            Entity     = "ServiceOrder",
+            RecordId   = order.Id,
+            Message    = $"New service order #SO-{order.Id} created",
+            OccurredAt = DateTime.UtcNow
+        });
 
         return MapToDto(createdOrder);
     }
@@ -102,11 +111,9 @@ public sealed class ServiceOrderService : IServiceOrderService
         EnsureOrderIsOpen(order);
 
         await EnsureMechanicAvailabilityAsync(
-            order.MechanicId,
-            order.CreatedAt,
+            order.MechanicId, order.CreatedAt,
             request.EstimatedDeliveryAt ?? order.EstimatedDeliveryAt ?? order.CreatedAt.AddHours(1),
-            order.AppointmentId,
-            order.Id);
+            order.AppointmentId, order.Id);
 
         order.Update(
             new WorkDescription(request.WorkPerformed),
@@ -115,6 +122,16 @@ public sealed class ServiceOrderService : IServiceOrderService
 
         _serviceOrderRepository.Update(order);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "update",
+            Entity     = "ServiceOrder",
+            RecordId   = id,
+            Message    = $"Service order #SO-{id} updated",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -138,6 +155,20 @@ public sealed class ServiceOrderService : IServiceOrderService
 
         _serviceOrderRepository.Update(order);
         await _dbContext.SaveChangesAsync();
+
+        // Obtener nombre del nuevo status
+        var allStatuses  = await _dbContext.OrderStatuses.ToListAsync();
+        var statusName   = allStatuses.FirstOrDefault(x => x.Id == request.OrderStatusId)?.Name.Value ?? "Unknown";
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "status",
+            Entity     = "ServiceOrder",
+            RecordId   = id,
+            Message    = $"Service order #SO-{id} status changed to {statusName}",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -147,9 +178,18 @@ public sealed class ServiceOrderService : IServiceOrderService
         if (order is null) return false;
 
         await ReleaseReservedPartsAsync(order.Id);
-
         _serviceOrderRepository.Remove(order);
         await _dbContext.SaveChangesAsync();
+
+        await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+        {
+            Type       = "delete",
+            Entity     = "ServiceOrder",
+            RecordId   = id,
+            Message    = $"Service order #SO-{id} deleted",
+            OccurredAt = DateTime.UtcNow
+        });
+
         return true;
     }
 
@@ -174,7 +214,6 @@ public sealed class ServiceOrderService : IServiceOrderService
             throw new ArgumentException($"Appointment {appointmentId.Value} does not exist.");
     }
 
-    // ── Fix: ToListAsync + filtro en memoria ───────
     private async Task<bool> ShouldCloseOrderAsync(int orderStatusId)
     {
         var all        = await _dbContext.OrderStatuses.ToListAsync();
@@ -206,16 +245,11 @@ public sealed class ServiceOrderService : IServiceOrderService
     }
 
     private async Task EnsureMechanicAvailabilityAsync(
-        int mechanicId,
-        DateTime startAt,
-        DateTime endAt,
-        int? appointmentId = null,
-        int? excludeServiceOrderId = null)
+        int mechanicId, DateTime startAt, DateTime endAt,
+        int? appointmentId = null, int? excludeServiceOrderId = null)
     {
         if (endAt <= startAt)
-        {
             throw new ArgumentException("Estimated delivery date must be after the service order start date.");
-        }
 
         var hasConflictingServiceOrder = await _dbContext.ServiceOrders
             .Where(x => x.MechanicId == mechanicId && x.ClosedAt == null)
@@ -225,24 +259,29 @@ public sealed class ServiceOrderService : IServiceOrderService
                 (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1)) > startAt);
 
         if (hasConflictingServiceOrder)
-        {
             throw new InvalidOperationException(
                 $"Mechanic {mechanicId} already has another active service order in that time range.");
-        }
 
-        var hasConflictingAppointment = await _dbContext.Appointments
+        var activeStatuses = await _dbContext.AppointmentStatuses.ToListAsync();
+        var activeStatusIds = activeStatuses
+            .Where(s => ActiveAppointmentStatuses.Contains(s.Name.Value.ToLower()))
+            .Select(s => s.Id)
+            .ToList();
+
+        var appointments = await _dbContext.Appointments
+            .Include(x => x.ServiceType)
             .Where(x => x.AssignedUserId == mechanicId)
             .Where(x => !appointmentId.HasValue || x.Id != appointmentId.Value)
-            .Where(x => ActiveAppointmentStatuses.Contains(x.AppointmentStatus.Name.Value.ToLower()))
-            .AnyAsync(x =>
-                x.AppointmentDate.Value < endAt &&
-                x.AppointmentDate.Value.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1) > startAt);
+            .Where(x => activeStatusIds.Contains(x.AppointmentStatusId))
+            .ToListAsync();
+
+        var hasConflictingAppointment = appointments.Any(x =>
+            x.AppointmentDate.Value < endAt &&
+            x.AppointmentDate.Value.AddHours(x.ServiceType?.EstimatedDuration?.Value ?? 1) > startAt);
 
         if (hasConflictingAppointment)
-        {
             throw new InvalidOperationException(
                 $"Mechanic {mechanicId} already has an appointment scheduled in that time range.");
-        }
     }
 
     private static void EnsureOrderIsOpen(ServiceOrder order)
@@ -265,14 +304,14 @@ public sealed class ServiceOrderService : IServiceOrderService
         {
             Id                  = order.Id,
             VehicleId           = order.VehicleId,
-            VehicleVin          = order.Vehicle?.VIN.Value          ?? string.Empty,
+            VehicleVin          = order.Vehicle?.VIN.Value         ?? string.Empty,
             VehicleDisplayName  = vehicleDisplayName,
             ServiceTypeId       = order.ServiceTypeId,
-            ServiceTypeName     = order.ServiceType?.Name.Value      ?? string.Empty,
+            ServiceTypeName     = order.ServiceType?.Name.Value     ?? string.Empty,
             MechanicId          = order.MechanicId,
             MechanicName        = mechanicFullName,
             OrderStatusId       = order.OrderStatusId,
-            OrderStatusName     = order.OrderStatus?.Name.Value      ?? string.Empty,
+            OrderStatusName     = order.OrderStatus?.Name.Value     ?? string.Empty,
             AppointmentId       = order.AppointmentId,
             CreatedAt           = order.CreatedAt,
             EstimatedDeliveryAt = order.EstimatedDeliveryAt,

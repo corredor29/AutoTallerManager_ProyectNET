@@ -6,10 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AutoTallerManager.Tests.Helpers;
 
+// Helper reutilizable para preparar datos o infraestructura de pruebas.
 public sealed class TestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    // Dependencia compartida por varios escenarios de esta clase de pruebas.
     private readonly string _dbName = Guid.NewGuid().ToString();
 
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureServices(services =>
@@ -30,6 +33,7 @@ public sealed class TestWebAppFactory : WebApplicationFactory<Program>, IAsyncLi
     }
 
     // Seed catalog data (DatabaseInitializer uses EnsureCreated for InMemory)
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
@@ -39,12 +43,15 @@ public sealed class TestWebAppFactory : WebApplicationFactory<Program>, IAsyncLi
         await initializer.InitializeAsync();
     }
 
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public new Task DisposeAsync() => base.DisposeAsync().AsTask();
 
     // ── Client helpers ──────────────────────────────────────────────
 
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public HttpClient CreateAnonymousClient() => CreateClient();
 
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public HttpClient CreateAuthenticatedClient(string? bearerToken = null)
     {
         var client = CreateClient();
@@ -54,11 +61,15 @@ public sealed class TestWebAppFactory : WebApplicationFactory<Program>, IAsyncLi
         return client;
     }
 
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public HttpClient CreateAdminClient()        => CreateAuthenticatedClient(JwtTokenHelper.AdminToken);
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public HttpClient CreateMechanicClient()     => CreateAuthenticatedClient(JwtTokenHelper.MechanicToken);
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public HttpClient CreateReceptionistClient() => CreateAuthenticatedClient(JwtTokenHelper.ReceptionistToken);
 
     // Access the scoped DbContext for seeding test-specific data
+    // Metodo de apoyo que simplifica la preparacion o reutilizacion del escenario.
     public async Task SeedAsync(Func<AutoTallerDbContext, Task> seeder)
     {
         using var scope = Services.CreateScope();

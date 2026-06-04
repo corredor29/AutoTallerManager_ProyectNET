@@ -13,10 +13,12 @@ using Infrastructure.Services;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class ServiceOrderServiceTests
 {
     // ── helpers ─────────────────────────────────────────────────────
 
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static ServiceOrderService CreateService(AutoTallerDbContext db) =>
         new(new ServiceOrderRepository(db), db);
 
@@ -33,6 +35,7 @@ public sealed class ServiceOrderServiceTests
     }
 
     // InMemory enforces NOT-NULL columns, so WorkPerformed and Notes must be non-null
+    // Construye un objeto de prueba con valores validos por defecto.
     private static CreateServiceOrderRequest BuildRequest(
         int vehicleId, int serviceTypeId, int mechanicId, int orderStatusId,
         DateTime? estimatedDeliveryAt = null) =>
@@ -49,6 +52,7 @@ public sealed class ServiceOrderServiceTests
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_VehicleHasNoActiveOrder_CreatesServiceOrderSuccessfully()
     {
@@ -66,6 +70,7 @@ public sealed class ServiceOrderServiceTests
         result.MechanicId.Should().Be(mechanicId);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_VehicleAlreadyHasActiveOrder_ThrowsInvalidOperationException()
     {
@@ -81,6 +86,7 @@ public sealed class ServiceOrderServiceTests
             .WithMessage("*active service order*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_NoEstimatedDeliveryAt_AutoCalculatesFromServiceTypeDuration()
     {
@@ -97,6 +103,7 @@ public sealed class ServiceOrderServiceTests
         result.EstimatedDeliveryAt.Value.Should().BeBefore(before.AddHours(4));
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_EstimatedDeliveryAtProvided_UsesClientValue()
     {
@@ -111,6 +118,7 @@ public sealed class ServiceOrderServiceTests
         result.EstimatedDeliveryAt.Should().BeCloseTo(clientDate, TimeSpan.FromSeconds(1));
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_MechanicHasConflictingAppointment_ThrowsInvalidOperationException()
     {
@@ -150,6 +158,7 @@ public sealed class ServiceOrderServiceTests
 
     // ── ChangeStatusAsync ────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatusAsync_OrderExists_ChangesStatusSuccessfully()
     {
@@ -169,6 +178,7 @@ public sealed class ServiceOrderServiceTests
         result.Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatusAsync_OrderNotFound_ReturnsFalse()
     {
@@ -187,6 +197,7 @@ public sealed class ServiceOrderServiceTests
 
     // ── GetAllPagedAsync ─────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_NoFilters_ReturnsPaginatedResult()
     {
@@ -204,6 +215,7 @@ public sealed class ServiceOrderServiceTests
         result.Items.Should().HaveCount(1);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterByCustomerId_ReturnsOnlyMatchingOrders()
     {

@@ -13,8 +13,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
+// Controlador que expone los endpoints principales del modulo TransmissionTypes.
     public sealed class TransmissionTypesController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly ITransmissionTypeService _transmissionTypeService;
 
         public TransmissionTypesController(ITransmissionTypeService transmissionTypeService)
@@ -22,6 +24,7 @@ namespace Api.Controllers
             _transmissionTypeService = transmissionTypeService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -29,6 +32,7 @@ namespace Api.Controllers
             return Ok(transmissionTypes);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -39,6 +43,7 @@ namespace Api.Controllers
             return Ok(transmissionType);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Create([FromBody] CreateTransmissionTypeRequest request)
@@ -47,6 +52,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = transmissionType.Id }, transmissionType);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateTransmissionTypeRequest request)
@@ -58,6 +64,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)

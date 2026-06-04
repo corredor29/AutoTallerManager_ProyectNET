@@ -11,8 +11,10 @@ namespace Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = AppRoles.AdminOrMechanic)]
+// Controlador que expone los endpoints principales del modulo Invoices.
 public sealed class InvoicesController : ControllerBase
 {
+    // Servicio que contiene la logica de negocio usada por este controlador.
     private readonly IInvoiceService _invoiceService;
 
     public InvoicesController(IInvoiceService invoiceService)
@@ -20,6 +22,7 @@ public sealed class InvoicesController : ControllerBase
         _invoiceService = invoiceService;
     }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] PaginationParams pagination,
@@ -30,6 +33,7 @@ public sealed class InvoicesController : ControllerBase
         return Ok(result);
     }
 
+    // Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -42,6 +46,7 @@ public sealed class InvoicesController : ControllerBase
         return Ok(invoice);
     }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateInvoiceRequest request)
     {
@@ -49,6 +54,7 @@ public sealed class InvoicesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, invoice);
     }
 
+    // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateInvoiceRequest request)
     {
@@ -61,6 +67,7 @@ public sealed class InvoicesController : ControllerBase
         return NoContent();
     }
 
+    // Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
     [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)

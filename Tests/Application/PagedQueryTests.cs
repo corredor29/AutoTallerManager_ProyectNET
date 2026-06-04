@@ -2,8 +2,10 @@ using Application.Requests.Customers;
 
 namespace AutoTallerManager.Tests.Application;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class PagedQueryTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void NormalizedPageNumber_ReturnsOne_WhenPageNumberIsLessThanOne()
     {
@@ -11,6 +13,7 @@ public sealed class PagedQueryTests
         request.NormalizedPageNumber.Should().Be(1);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void NormalizedPageNumber_ReturnsValue_WhenPageNumberIsValid()
     {
@@ -18,6 +21,7 @@ public sealed class PagedQueryTests
         request.NormalizedPageNumber.Should().Be(3);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void NormalizedPageSize_ReturnsDefault_WhenPageSizeIsLessThanOne()
     {
@@ -25,6 +29,7 @@ public sealed class PagedQueryTests
         request.NormalizedPageSize.Should().Be(10);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void NormalizedPageSize_ReturnsMax_WhenPageSizeExceedsLimit()
     {
@@ -32,6 +37,7 @@ public sealed class PagedQueryTests
         request.NormalizedPageSize.Should().Be(50); // MaxPageSize = 50
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void NormalizedPageSize_ReturnsValue_WhenPageSizeIsValid()
     {

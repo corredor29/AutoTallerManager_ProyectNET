@@ -13,8 +13,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Admin)]
+// Controlador que expone los endpoints principales del modulo Roles.
     public sealed class RolesController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IRoleService _roleService;
 
         public RolesController(IRoleService roleService)
@@ -22,6 +24,7 @@ namespace Api.Controllers
             _roleService = roleService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> GetAll()
@@ -30,6 +33,7 @@ namespace Api.Controllers
             return Ok(roles);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> GetById(int id)
@@ -41,6 +45,7 @@ namespace Api.Controllers
             return Ok(role);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateRoleRequest request)
         {
@@ -48,6 +53,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = role.Id }, role);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateRoleRequest request)
         {
@@ -58,6 +64,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {

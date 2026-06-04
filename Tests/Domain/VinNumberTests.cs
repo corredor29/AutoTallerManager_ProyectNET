@@ -2,8 +2,10 @@ using Domain.ValueObject.Vehicles.Vehicle;
 
 namespace AutoTallerManager.Tests.Domain;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class VinNumberTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Constructor_ValidVin17Chars_CreatesVinNumber()
     {
@@ -11,6 +13,7 @@ public sealed class VinNumberTests
         vin.Value.Should().Be("1HGCM82633A004352");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Theory]
     [InlineData("1HGCM82633A00435")]  // 16 chars
     [InlineData("1HGCM82633A0043521")] // 18 chars
@@ -21,6 +24,7 @@ public sealed class VinNumberTests
            .WithMessage("*17 characters*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -31,6 +35,7 @@ public sealed class VinNumberTests
            .WithMessage("*empty*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Constructor_VinWithSpecialCharacters_ThrowsArgumentException()
     {
@@ -39,6 +44,7 @@ public sealed class VinNumberTests
            .WithMessage("*letters and digits*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Constructor_LowercaseVin_StoresUppercase()
     {

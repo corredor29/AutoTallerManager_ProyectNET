@@ -9,8 +9,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
+// Controlador que expone los endpoints principales del modulo DocumentTypes.
     public sealed class DocumentTypesController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IDocumentTypeService _documentTypeService;
 
         public DocumentTypesController(IDocumentTypeService documentTypeService)
@@ -18,6 +20,7 @@ namespace Api.Controllers
             _documentTypeService = documentTypeService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> GetAll()
@@ -26,6 +29,7 @@ namespace Api.Controllers
             return Ok(documentTypes);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> GetById(int id)
@@ -37,6 +41,7 @@ namespace Api.Controllers
             return Ok(documentType);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Create([FromBody] CreateDocumentTypeRequest request)
@@ -45,6 +50,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = documentType.Id }, documentType);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateDocumentTypeRequest request)
@@ -56,6 +62,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)

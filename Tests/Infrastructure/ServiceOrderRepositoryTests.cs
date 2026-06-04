@@ -4,8 +4,10 @@ using Infrastructure.Repositories;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class ServiceOrderRepositoryTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static ServiceOrderRepository CreateRepository(AutoTallerDbContext db) =>
         new(db);
 
@@ -23,6 +25,7 @@ public sealed class ServiceOrderRepositoryTests
 
     // ── HasActiveOrderForVehicleAsync ────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task HasActiveOrderForVehicleAsync_VehicleHasPendingOrder_ReturnsTrue()
     {
@@ -39,6 +42,7 @@ public sealed class ServiceOrderRepositoryTests
         result.Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task HasActiveOrderForVehicleAsync_VehicleHasInProgressOrder_ReturnsTrue()
     {
@@ -55,6 +59,7 @@ public sealed class ServiceOrderRepositoryTests
         result.Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task HasActiveOrderForVehicleAsync_VehicleHasNoOrders_ReturnsFalse()
     {
@@ -67,6 +72,7 @@ public sealed class ServiceOrderRepositoryTests
         result.Should().BeFalse();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task HasActiveOrderForVehicleAsync_VehicleHasOnlyCompletedOrder_ReturnsFalse()
     {
@@ -87,6 +93,7 @@ public sealed class ServiceOrderRepositoryTests
 
     // ── GetAllPagedAsync ─────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_MultipleOrders_ReturnsPaginatedResult()
     {
@@ -111,6 +118,7 @@ public sealed class ServiceOrderRepositoryTests
         result.HasPreviousPage.Should().BeFalse();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterByOrderStatusId_ReturnsOnlyMatchingOrders()
     {
