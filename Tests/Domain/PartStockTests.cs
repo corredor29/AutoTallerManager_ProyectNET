@@ -3,8 +3,10 @@ using Domain.ValueObject.Parts.Part;
 
 namespace AutoTallerManager.Tests.Domain;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class PartStockTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Constructor_ZeroStock_IsValid()
     {
@@ -13,6 +15,7 @@ public sealed class PartStockTests
         stock.IsEmpty.Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Constructor_PositiveStock_IsValid()
     {
@@ -21,6 +24,7 @@ public sealed class PartStockTests
         stock.IsEmpty.Should().BeFalse();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Constructor_NegativeStock_ThrowsArgumentException()
     {
@@ -29,6 +33,7 @@ public sealed class PartStockTests
            .WithMessage("*negative*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Part_AddStock_IncreasesStockCorrectly()
     {
@@ -39,6 +44,7 @@ public sealed class PartStockTests
         part.Stock.Value.Should().Be(8);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Part_RemoveStock_DecreasesStockCorrectly()
     {
@@ -50,6 +56,7 @@ public sealed class PartStockTests
         part.IsBelowMinStock().Should().BeFalse();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Part_RemoveStock_InsufficientStock_ThrowsInvalidOperationException()
     {
@@ -61,6 +68,7 @@ public sealed class PartStockTests
            .WithMessage("*Insufficient stock*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Part_IsBelowMinStock_ReturnsTrueWhenStockDropsBelowMinimum()
     {
@@ -69,6 +77,7 @@ public sealed class PartStockTests
         part.IsBelowMinStock().Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void Part_IsBelowMinStock_ReturnsFalseWhenStockIsAboveMinimum()
     {
@@ -77,6 +86,7 @@ public sealed class PartStockTests
         part.IsBelowMinStock().Should().BeFalse();
     }
 
+    // Construye un objeto de prueba con valores validos por defecto.
     private static Part BuildPart(int stock = 10, int minStock = 2) =>
         new(
             partCategoryId: 1,

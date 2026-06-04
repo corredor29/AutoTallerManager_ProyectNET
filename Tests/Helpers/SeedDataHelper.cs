@@ -41,6 +41,7 @@ internal static class SeedDataHelper
     }
 
     // ── Appointment Statuses ───────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedAppointmentStatusPendingAsync(AutoTallerDbContext db)
     {
         var status = new AppointmentStatus(new AppointmentStatusName("Pending"));
@@ -92,6 +93,7 @@ internal static class SeedDataHelper
     }
 
     // ── Vehicle ───────────────────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedVehicleAsync(
         AutoTallerDbContext db, int modelId, string vin = "1HGCM82633A000001")
     {
@@ -122,6 +124,7 @@ internal static class SeedDataHelper
     }
 
     // ── Part Category ──────────────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedPartCategoryAsync(
         AutoTallerDbContext db, string name = "Engine Parts")
     {
@@ -132,6 +135,7 @@ internal static class SeedDataHelper
     }
 
     // ── Part ───────────────────────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedPartAsync(
         AutoTallerDbContext db, int categoryId,
         string code = "ENG-001", int stock = 10, int minStock = 2, decimal unitPrice = 150m)
@@ -150,6 +154,7 @@ internal static class SeedDataHelper
     }
 
     // ── Service Order ──────────────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedServiceOrderAsync(
         AutoTallerDbContext db,
         int vehicleId, int serviceTypeId, int mechanicId, int orderStatusId)
@@ -165,6 +170,7 @@ internal static class SeedDataHelper
     }
 
     // ── Quotation ─────────────────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedQuotationAsync(
         AutoTallerDbContext db,
         int serviceOrderId, int createdByUserId, int quotationStatusId,
@@ -183,6 +189,7 @@ internal static class SeedDataHelper
     }
 
     // ── Appointment ───────────────────────────────────────────────
+    // Inserta datos base requeridos por varias pruebas relacionadas.
     internal static async Task<int> SeedAppointmentAsync(
         AutoTallerDbContext db,
         int customerId, int vehicleId, int serviceTypeId, int appointmentStatusId)

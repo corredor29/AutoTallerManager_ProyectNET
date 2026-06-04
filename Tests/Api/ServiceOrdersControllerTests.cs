@@ -6,8 +6,10 @@ using Application.DTOs.ServiceOrders;
 
 namespace AutoTallerManager.Tests.Api;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFactory>, IAsyncLifetime
 {
+    // Dependencia compartida por varios escenarios de esta clase de pruebas.
     private readonly TestWebAppFactory _factory;
 
     public ServiceOrdersControllerTests(TestWebAppFactory factory)
@@ -20,6 +22,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
 
     // ── GET /api/serviceorders ───────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAll_WithoutToken_Returns401Unauthorized()
     {
@@ -30,6 +33,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAll_WithValidToken_Returns200WithPagedResult()
     {
@@ -44,6 +48,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
         body.GetProperty("data").TryGetProperty("totalCount", out _).Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAll_WithPaginationParams_ReturnsPaginatedResponse()
     {
@@ -57,6 +62,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
 
     // ── GET /api/serviceorders/{id} ──────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetById_WithoutToken_Returns401Unauthorized()
     {
@@ -67,6 +73,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetById_NonExistentId_Returns404NotFound()
     {
@@ -79,6 +86,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
 
     // ── POST /api/serviceorders ──────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Post_WithoutToken_Returns401Unauthorized()
     {
@@ -89,6 +97,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Post_WithMechanicToken_Returns403Forbidden()
     {
@@ -108,6 +117,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
 
     // ── PUT /api/serviceorders/{id}/status ───────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatus_WithoutToken_Returns401Unauthorized()
     {
@@ -118,6 +128,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatus_NonExistentOrder_Returns404NotFound()
     {
@@ -131,6 +142,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
 
     // ── DELETE /api/serviceorders/{id} ───────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Delete_WithoutToken_Returns401Unauthorized()
     {
@@ -141,6 +153,7 @@ public sealed class ServiceOrdersControllerTests : IClassFixture<TestWebAppFacto
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Delete_WithMechanicToken_Returns403Forbidden()
     {

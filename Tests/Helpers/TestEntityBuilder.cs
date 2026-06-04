@@ -9,6 +9,7 @@ namespace AutoTallerManager.Tests.Helpers;
 
 internal static class TestEntityBuilder
 {
+    // Construye un objeto de prueba con valores validos por defecto.
     public static User BuildUser(
         int userId = 1,
         int personId = 1,

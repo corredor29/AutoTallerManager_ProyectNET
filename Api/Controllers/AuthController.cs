@@ -10,6 +10,7 @@ namespace Api.Controllers;
 [Route("api/[controller]")]
 public sealed class AuthController : ControllerBase
 {
+    // Servicio que concentra la lógica de login y registro.
     private readonly IAuthService _authService;
 
     public AuthController(IAuthService authService)
@@ -17,16 +18,20 @@ public sealed class AuthController : ControllerBase
         _authService = authService;
     }
 
+    // Permite iniciar sesión sin requerir un token previo.
     [AllowAnonymous]
     [HttpPost("login")]
+    // Protege este endpoint contra intentos masivos de autenticación.
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var result = await _authService.LoginAsync(request);
         return Ok(result);
     }
+    // Permite registrar usuarios nuevos sin autenticación previa.
     [AllowAnonymous]
     [HttpPost("register")]
+    // Comparte la misma política de límite para evitar abuso del registro.
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {

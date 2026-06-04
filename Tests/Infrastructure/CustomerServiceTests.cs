@@ -8,6 +8,7 @@ using Domain.ValueObject.Persons.PhoneCode;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class CustomerServiceTests
 {
     static CustomerServiceTests()
@@ -15,11 +16,13 @@ public sealed class CustomerServiceTests
         MapsterConfig.Register(TypeAdapterConfig.GlobalSettings);
     }
 
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static CustomerService CreateService(AutoTallerDbContext db) =>
         new(new CustomerRepository(db), db);
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_ValidRequest_CreatesCustomerWithPersonData()
     {
@@ -40,6 +43,7 @@ public sealed class CustomerServiceTests
         result.IsActive.Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_MultipleCustomers_EachGetsUniqueId()
     {
@@ -52,6 +56,7 @@ public sealed class CustomerServiceTests
         c1.Id.Should().NotBe(c2.Id);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task RegisterWithVehicleAsync_ValidRequest_CreatesCustomerContactAndVehicle()
     {
@@ -89,6 +94,7 @@ public sealed class CustomerServiceTests
 
     // ── DeleteAsync ──────────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task DeleteAsync_CustomerNotFound_ReturnsFalse()
     {
@@ -100,6 +106,7 @@ public sealed class CustomerServiceTests
         result.Should().BeFalse();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task DeleteAsync_CustomerHasAppointments_ThrowsInvalidOperationException()
     {
@@ -129,6 +136,7 @@ public sealed class CustomerServiceTests
             .WithMessage("*appointments*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task DeleteAsync_CustomerWithNoDependencies_DeletesSuccessfully()
     {

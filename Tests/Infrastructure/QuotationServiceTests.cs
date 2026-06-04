@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class QuotationServiceTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static QuotationService CreateService(AutoTallerDbContext db) =>
         new(new QuotationRepository(db), db);
 
@@ -31,6 +33,7 @@ public sealed class QuotationServiceTests
 
     // ── ChangeStatusAsync → Accept ───────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatusAsync_Accept_ChangesStatusToAccepted()
     {
@@ -53,6 +56,7 @@ public sealed class QuotationServiceTests
 
     // ── ChangeStatusAsync → Reject ───────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatusAsync_Reject_ChangesStatusAndCreatesDiagnosisOnlyInvoice()
     {
@@ -80,6 +84,7 @@ public sealed class QuotationServiceTests
         invoice.QuotationId.Should().Be(quotationId);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatusAsync_Reject_ServiceOrderAlreadyHasInvoice_DoesNotDuplicateInvoice()
     {
@@ -112,6 +117,7 @@ public sealed class QuotationServiceTests
         invoiceCount.Should().Be(1);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task ChangeStatusAsync_QuotationNotFound_ReturnsFalse()
     {

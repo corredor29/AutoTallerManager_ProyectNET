@@ -13,8 +13,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Staff)]
+// Controlador que expone los endpoints principales del modulo MileageHistory.
     public sealed class MileageHistoryController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IMileageHistoryService _mileageHistoryService;
 
         public MileageHistoryController(IMileageHistoryService mileageHistoryService)
@@ -22,6 +24,7 @@ namespace Api.Controllers
             _mileageHistoryService = mileageHistoryService;
         }
 
+    // Obtiene los registros asociados a un vehiculo especifico.
         [HttpGet("vehicle/{vehicleId:int}")]
         public async Task<IActionResult> GetByVehicleId(int vehicleId)
         {
@@ -29,6 +32,7 @@ namespace Api.Controllers
             return Ok(mileageHistories);
         }
 
+    // Recupera el ultimo registro disponible para el vehiculo indicado.
         [HttpGet("vehicle/{vehicleId:int}/latest")]
         public async Task<IActionResult> GetLatestByVehicleId(int vehicleId)
         {
@@ -39,6 +43,7 @@ namespace Api.Controllers
             return Ok(mileageHistory);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -49,6 +54,7 @@ namespace Api.Controllers
             return Ok(mileageHistory);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         [Authorize(Roles = AppRoles.AdminOrMechanic)]
         public async Task<IActionResult> Create([FromBody] CreateMileageHistoryRequest request)
@@ -57,6 +63,7 @@ namespace Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = mileageHistory.Id }, mileageHistory);
         }
 
+    // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
         [Authorize(Roles = AppRoles.AdminOrMechanic)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateMileageHistoryRequest request)
@@ -68,6 +75,7 @@ namespace Api.Controllers
             return NoContent();
         }
 
+    // Elimina el registro indicado si existe.
         [HttpDelete("{id:int}")]
         [Authorize(Roles = AppRoles.Admin)]
         public async Task<IActionResult> Delete(int id)

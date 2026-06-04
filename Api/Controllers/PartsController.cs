@@ -13,8 +13,10 @@ namespace Api.Controllers;
 [Route("api/[controller]")]
 [Authorize(Roles = AppRoles.Staff)]
 [EnableRateLimiting("parts")]
+// Controlador que expone los endpoints principales del modulo Parts.
 public sealed class PartsController : ControllerBase
 {
+    // Servicio que contiene la logica de negocio usada por este controlador.
     private readonly IPartService _partService;
 
     public PartsController(IPartService partService)
@@ -22,6 +24,7 @@ public sealed class PartsController : ControllerBase
         _partService = partService;
     }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] PaginationParams pagination,
@@ -32,6 +35,7 @@ public sealed class PartsController : ControllerBase
         return Ok(result);
     }
 
+    // Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -44,6 +48,7 @@ public sealed class PartsController : ControllerBase
         return Ok(part);
     }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
     [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Create([FromBody] CreatePartRequest request)
@@ -52,6 +57,7 @@ public sealed class PartsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = part.Id }, part);
     }
 
+    // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
     [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePartRequest request)
@@ -65,6 +71,7 @@ public sealed class PartsController : ControllerBase
         return NoContent();
     }
 
+    // Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
     [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)

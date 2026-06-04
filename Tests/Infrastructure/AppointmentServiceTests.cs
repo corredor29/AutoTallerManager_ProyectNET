@@ -9,11 +9,14 @@ using Infrastructure.Services;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class AppointmentServiceTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static AppointmentService CreateService(AutoTallerDbContext db) =>
         new(new AppointmentRepository(db), db);
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_MechanicHasConflictingAppointment_ThrowsInvalidOperationException()
     {

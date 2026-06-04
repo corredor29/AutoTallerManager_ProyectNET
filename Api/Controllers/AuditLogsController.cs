@@ -14,8 +14,10 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = AppRoles.Admin)]
+// Controlador que expone los endpoints principales del modulo AuditLogs.
     public sealed class AuditLogsController : ControllerBase
     {
+    // Servicio que contiene la logica de negocio usada por este controlador.
         private readonly IAuditLogService _auditLogService;
 
         public AuditLogsController(IAuditLogService auditLogService)
@@ -23,6 +25,7 @@ namespace Api.Controllers
             _auditLogService = auditLogService;
         }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -30,6 +33,7 @@ namespace Api.Controllers
             return Ok(logs);
         }
 
+    // Busca un registro puntual por su identificador.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -40,6 +44,7 @@ namespace Api.Controllers
             return Ok(log);
         }
 
+    // Obtiene los registros asociados a un usuario especifico.
         [HttpGet("user/{userId:int}")]
         public async Task<IActionResult> GetByUserId(int userId)
         {
@@ -47,6 +52,7 @@ namespace Api.Controllers
             return Ok(logs);
         }
 
+    // Filtra registros relacionados con una entidad concreta.
         [HttpGet("entity/{entityName}")]
         public async Task<IActionResult> GetByEntity(string entityName)
         {
@@ -54,6 +60,7 @@ namespace Api.Controllers
             return Ok(logs);
         }
 
+    // Filtra registros dentro de un rango de fechas recibido por query.
         [HttpGet("date-range")]
         public async Task<IActionResult> GetByDateRange(
             [FromQuery] DateTime from,
@@ -63,6 +70,7 @@ namespace Api.Controllers
             return Ok(logs);
         }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateAuditLogRequest request)
         {

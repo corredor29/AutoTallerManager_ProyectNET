@@ -12,14 +12,19 @@ namespace Infrastructure;
 
 public static class DependencyInjection
 {
+    // Agrupa en un solo punto todo el registro de dependencias de Infrastructure.
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Permite acceder al usuario actual y otros datos del contexto HTTP desde servicios.
         services.AddHttpContextAccessor();
+        // Registra el DbContext principal conectado a PostgreSQL.
         services.AddDbContext<AutoTallerDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        // Servicio encargado de preparar/sembrar la base de datos al arranque.
         services.AddScoped<DatabaseInitializer>();
+        // Repositorios: encapsulan el acceso a datos por cada agregado o módulo.
         services.AddScoped<ICustomerRepository,            CustomerRepository>();
         services.AddScoped<IAppointmentRepository,         AppointmentRepository>();
         services.AddScoped<IVehicleRepository,             VehicleRepository>();
@@ -44,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository,                UserRepository>();
         services.AddScoped<IRoleRepository,                RoleRepository>();
         services.AddScoped<IUserRoleRepository,            UserRoleRepository>();
+        // Servicios: contienen la lógica de negocio consumida por los controladores.
         services.AddScoped<ICustomerService,            CustomerService>();
         services.AddScoped<IAppointmentService,         AppointmentService>();
         services.AddScoped<IVehicleService,             VehicleService>();

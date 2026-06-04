@@ -6,8 +6,10 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Controlador que expone los endpoints principales del modulo Quotations.
 public sealed class QuotationsController : ControllerBase
 {
+    // Servicio que contiene la logica de negocio usada por este controlador.
     private readonly IQuotationService _quotationService;
 
     public QuotationsController(IQuotationService quotationService)
@@ -15,6 +17,7 @@ public sealed class QuotationsController : ControllerBase
         _quotationService = quotationService;
     }
 
+    // Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -22,6 +25,7 @@ public sealed class QuotationsController : ControllerBase
         return Ok(quotations);
     }
 
+    // Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -34,6 +38,7 @@ public sealed class QuotationsController : ControllerBase
         return Ok(quotation);
     }
 
+    // Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateQuotationRequest request)
     {
@@ -41,6 +46,7 @@ public sealed class QuotationsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = quotation.Id }, quotation);
     }
 
+    // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateQuotationRequest request)
     {
@@ -53,6 +59,7 @@ public sealed class QuotationsController : ControllerBase
         return NoContent();
     }
 
+    // Cambia el estado del registro usando una solicitud especifica.
     [HttpPut("{id:int}/status")]
     public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeQuotationStatusRequest request)
     {
@@ -65,6 +72,7 @@ public sealed class QuotationsController : ControllerBase
         return NoContent();
     }
 
+    // Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

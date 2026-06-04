@@ -18,14 +18,18 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Registra la configuración global de Mapster para mapear entidades y DTOs.
 MapsterConfig.Register(TypeAdapterConfig.GlobalSettings);
+// Este filtro centraliza el formato de respuesta de la API.
 builder.Services.AddScoped<ApiResponseFilter>();
 builder.Services.AddControllers(options =>
 {
+    // Aplica el filtro a todos los controladores automáticamente.
     options.Filters.Add<ApiResponseFilter>();
 });
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
+    // Reemplaza la respuesta por defecto de ASP.NET cuando falla la validación del modelo.
     options.InvalidModelStateResponseFactory = context =>
     {
         var errors = context.ModelState
@@ -53,6 +57,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    // Define la información principal que Swagger mostrará de la API.
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title       = "AutoTallerManager API",
@@ -60,6 +65,7 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Sistema de Gestión de Taller Automotriz"
     });
 
+    // Configura autenticación JWT dentro de Swagger UI.
     var securityScheme = new OpenApiSecurityScheme
     {
         Name         = "Authorization",
@@ -88,9 +94,11 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Carga opciones tipadas desde la configuración del proyecto.
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<RouteRateLimitOptions>(builder.Configuration.GetSection(RouteRateLimitOptions.SectionName));
 
+// Valida desde el arranque que exista una configuración JWT utilizable.
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
 var rateLimitOptions = builder.Configuration.GetSection(RouteRateLimitOptions.SectionName).Get<RouteRateLimitOptions>()
@@ -99,6 +107,7 @@ var rateLimitOptions = builder.Configuration.GetSection(RouteRateLimitOptions.Se
 if (string.IsNullOrWhiteSpace(jwtOptions.Key))
     throw new InvalidOperationException("JWT signing key is missing.");
 
+// Habilita autenticación bearer usando JWT firmado con clave simétrica.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -116,9 +125,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+// SignalR se usa para emitir notificaciones en tiempo real a los clientes.
 builder.Services.AddSignalR();
 builder.Services.AddRateLimiter(options =>
 {
+    // Si un cliente supera el límite, se devuelve 429 con cuerpo JSON uniforme.
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, cancellationToken) =>
     {
@@ -183,6 +194,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFront", policy =>
     {
+        // Autoriza los orígenes locales del frontend durante desarrollo.
         policy
             .WithOrigins(
                 "http://localhost:5500",
@@ -197,18 +209,21 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Registra DbContext, repositorios y servicios de la capa Infrastructure.
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    // Prepara la base de datos al iniciar la aplicación.
     var databaseInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
     await databaseInitializer.InitializeAsync();
 }
 
 if (app.Environment.IsDevelopment())
 {
+    // Swagger solo se habilita en entorno de desarrollo.
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
@@ -218,12 +233,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Captura excepciones no controladas y las transforma en respuestas manejables.
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseCors("AllowFront");
 app.UseHttpsRedirection();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// Expone el hub de SignalR para notificaciones del sistema.
 app.MapHub<Infrastructure.Hubs.NotificationHub>("/hubs/notifications");
 
 app.MapControllers();

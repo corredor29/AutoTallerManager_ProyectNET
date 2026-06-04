@@ -25,7 +25,9 @@ namespace Infrastructure.Context
 
     public class AutoTallerDbContext : DbContext
     {
+        // Permite leer el usuario autenticado actual para registrar auditoria.
         private readonly IHttpContextAccessor _httpContextAccessor;
+        // Evita que el proceso de auditoria se dispare recursivamente al guardar los logs.
         private bool _isAuditing;
 
         public AutoTallerDbContext(
@@ -35,6 +37,7 @@ namespace Infrastructure.Context
         {
             _httpContextAccessor = httpContextAccessor;
         }
+        // Cada DbSet representa una tabla o agregado principal del dominio.
         public DbSet<Person>         Persons         => Set<Person>();
         public DbSet<DocumentType>   DocumentTypes   => Set<DocumentType>();
         public DbSet<PersonDocument> PersonDocuments => Set<PersonDocument>();
@@ -82,6 +85,7 @@ namespace Infrastructure.Context
         {
             base.OnModelCreating(modelBuilder);
 
+            // Aplica automaticamente todas las configuraciones EntityTypeConfiguration del ensamblado.
             modelBuilder.ApplyConfigurationsFromAssembly(
                 typeof(AutoTallerDbContext).Assembly
             );
@@ -89,6 +93,7 @@ namespace Infrastructure.Context
 
         public override int SaveChanges()
         {
+            // Redirige al flujo asincrono para reutilizar la misma logica de auditoria.
             return SaveChangesAsync().GetAwaiter().GetResult();
         }
 
@@ -96,9 +101,11 @@ namespace Infrastructure.Context
         {
             if (_isAuditing)
             {
+                // Cuando ya se esta auditando, guarda directo para no entrar en bucle.
                 return await base.SaveChangesAsync(cancellationToken);
             }
 
+            // Captura los cambios relevantes antes de persistirlos para luego generar su log.
             var pendingAuditEntries = PrepareAuditEntries();
 
             _isAuditing = true;
@@ -109,6 +116,7 @@ namespace Infrastructure.Context
 
                 if (pendingAuditEntries.Count > 0)
                 {
+                    // Despues del guardado principal ya existe el id final y se puede registrar auditoria.
                     await PersistAuditEntriesAsync(pendingAuditEntries, cancellationToken);
                 }
 
@@ -124,6 +132,7 @@ namespace Infrastructure.Context
         {
             var pendingAuditEntries = new List<PendingAuditEntry>();
 
+            // Recorre solo entidades del dominio para detectar altas, cambios y eliminaciones.
             foreach (var entry in ChangeTracker.Entries<BaseEntity>())
             {
                 if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
@@ -131,6 +140,7 @@ namespace Infrastructure.Context
                     continue;
                 }
 
+                // Los propios logs de auditoria no deben auditarse a si mismos.
                 if (entry.Entity is AuditLog or AuditActionType)
                 {
                     continue;
@@ -159,12 +169,14 @@ namespace Infrastructure.Context
             IReadOnlyCollection<PendingAuditEntry> pendingAuditEntries,
             CancellationToken cancellationToken)
         {
+            // Usa el usuario autenticado actual o, si no existe, un usuario base del sistema.
             var currentUserId = ResolveCurrentUserId() ?? await ResolveFallbackUserIdAsync(cancellationToken);
             if (!currentUserId.HasValue)
             {
                 return;
             }
 
+            // Resuelve los ids de tipos de accion ya sembrados en catalogo.
             var actionNames = pendingAuditEntries
                 .Select(x => x.ActionName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -187,6 +199,7 @@ namespace Infrastructure.Context
                     continue;
                 }
 
+                // En inserts el id final puede quedar disponible solo despues del SaveChanges principal.
                 if (pendingAuditEntry.RecordId <= 0)
                 {
                     pendingAuditEntry.RecordId = GetRecordId(pendingAuditEntry.Entry);
@@ -207,12 +220,14 @@ namespace Infrastructure.Context
 
             if (ChangeTracker.Entries<AuditLog>().Any(x => x.State == EntityState.Added))
             {
+                // Guarda un segundo ciclo solo si efectivamente se agregaron logs.
                 await base.SaveChangesAsync(cancellationToken);
             }
         }
 
         private int GetRecordId(EntityEntry entry)
         {
+            // Intenta leer la PK actual y, si no existe aun, la original.
             var primaryKey = entry.Properties.FirstOrDefault(x => x.Metadata.IsPrimaryKey());
             if (primaryKey is null)
             {
@@ -234,6 +249,7 @@ namespace Infrastructure.Context
 
         private static string BuildDescription(EntityEntry entry)
         {
+            // Genera un mensaje simple y entendible segun el tipo de operacion detectada.
             return entry.State switch
             {
                 EntityState.Added => $"Created {entry.Metadata.ClrType.Name}.",
@@ -245,6 +261,7 @@ namespace Infrastructure.Context
 
         private static string BuildUpdateDescription(EntityEntry entry)
         {
+            // En updates lista las propiedades modificadas para que el log sea mas util.
             var modifiedProperties = entry.Properties
                 .Where(x => x.IsModified && !x.Metadata.IsPrimaryKey())
                 .Select(x => x.Metadata.Name)
@@ -257,6 +274,7 @@ namespace Infrastructure.Context
 
         private int? ResolveCurrentUserId()
         {
+            // Busca el id del usuario en los claims mas comunes del token JWT.
             var user = _httpContextAccessor.HttpContext?.User;
             if (user?.Identity?.IsAuthenticated != true)
             {
@@ -274,6 +292,7 @@ namespace Infrastructure.Context
 
         private async Task<int?> ResolveFallbackUserIdAsync(CancellationToken cancellationToken)
         {
+            // Como respaldo usa el primer usuario disponible para no perder auditoria del sistema.
             return await Users
                 .OrderBy(x => x.Id)
                 .Select(x => (int?)x.Id)
@@ -282,6 +301,7 @@ namespace Infrastructure.Context
 
         private sealed class PendingAuditEntry
         {
+            // Guarda temporalmente la informacion necesaria antes de crear el AuditLog definitivo.
             public required EntityEntry Entry { get; init; }
             public required string EntityName { get; init; }
             public required string ActionName { get; init; }
