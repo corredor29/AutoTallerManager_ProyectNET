@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Http;
 
 namespace AutoTallerManager.Tests.Api;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class ApiExceptionMiddlewareTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task InvokeAsync_ReturnsStandardizedConflictResponse_WhenBusinessRuleFails()
     {

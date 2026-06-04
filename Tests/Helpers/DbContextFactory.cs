@@ -2,6 +2,7 @@ namespace AutoTallerManager.Tests.Helpers;
 
 internal static class DbContextFactory
 {
+    // Crea una instancia lista para usar dentro de los escenarios de prueba.
     internal static AutoTallerDbContext Create()
     {
         var options = new DbContextOptionsBuilder<AutoTallerDbContext>()

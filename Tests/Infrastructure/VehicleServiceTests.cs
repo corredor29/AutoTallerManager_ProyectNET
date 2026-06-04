@@ -4,13 +4,16 @@ using Infrastructure.Services;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class VehicleServiceTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static VehicleService CreateService(AutoTallerDbContext db) =>
         new(new VehicleRepository(db), db);
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_ValidRequest_CreatesVehicleSuccessfully()
     {
@@ -35,6 +38,7 @@ public sealed class VehicleServiceTests
         result.BrandName.Should().Be("Toyota");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_DuplicateVin_ThrowsInvalidOperationException()
     {
@@ -56,6 +60,7 @@ public sealed class VehicleServiceTests
             .WithMessage("*already registered*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_ModelDoesNotExist_ThrowsArgumentException()
     {
@@ -73,6 +78,7 @@ public sealed class VehicleServiceTests
 
     // ── UpdateAsync (mileage) ────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task UpdateAsync_ValidMileage_UpdatesVehicleSuccessfully()
     {
@@ -98,6 +104,7 @@ public sealed class VehicleServiceTests
         updated!.Mileage.Should().Be(25_000);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task UpdateAsync_VehicleNotFound_ReturnsFalse()
     {

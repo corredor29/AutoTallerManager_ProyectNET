@@ -8,13 +8,16 @@ using Infrastructure.Services;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class PartServiceTests
 {
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static PartService CreateService(AutoTallerDbContext db) =>
         new(new PartRepository(db), db);
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_UniqueCode_CreatesPartSuccessfully()
     {
@@ -39,6 +42,7 @@ public sealed class PartServiceTests
         result.IsActive.Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_DuplicateCode_ThrowsInvalidOperationException()
     {
@@ -62,6 +66,7 @@ public sealed class PartServiceTests
             .WithMessage("*already exists*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task CreateAsync_CategoryDoesNotExist_ThrowsArgumentException()
     {
@@ -80,6 +85,7 @@ public sealed class PartServiceTests
 
     // ── Domain entity: AddStock / RemoveStock ────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void AddStock_IncreasesStockCorrectly()
     {
@@ -90,6 +96,7 @@ public sealed class PartServiceTests
         part.Stock.Value.Should().Be(8);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void RemoveStock_InsufficientStock_ThrowsInvalidOperationException()
     {
@@ -101,6 +108,7 @@ public sealed class PartServiceTests
            .WithMessage("*Insufficient stock*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterByCategory_ReturnsOnlyMatchingParts()
     {
@@ -119,6 +127,7 @@ public sealed class PartServiceTests
         result.Items.Should().ContainSingle(p => p.Code == "A-001");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterBelowMinStock_ReturnsOnlyLowStockParts()
     {
@@ -136,6 +145,7 @@ public sealed class PartServiceTests
         result.Items.Should().ContainSingle(p => p.Code == "LOW-001");
     }
 
+    // Construye un objeto de prueba con valores validos por defecto.
     private static Part BuildPart(int stock = 10) =>
         new(1, new PartCode("TST-001"), new PartDescription("Test"),
             new PartStock(stock), new PartMinStock(2), new PartUnitPrice(50m));

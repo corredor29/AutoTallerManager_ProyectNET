@@ -4,8 +4,10 @@ using System.Text.Json;
 
 namespace AutoTallerManager.Tests.Api;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAsyncLifetime
 {
+    // Dependencia compartida por varios escenarios de esta clase de pruebas.
     private readonly TestWebAppFactory _factory;
 
     public PartsControllerTests(TestWebAppFactory factory)
@@ -18,6 +20,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
 
     // ── GET /api/parts ───────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAll_WithoutToken_Returns401Unauthorized()
     {
@@ -28,6 +31,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAll_WithValidToken_Returns200WithPagedResult()
     {
@@ -41,6 +45,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
         body.GetProperty("data").TryGetProperty("items", out _).Should().BeTrue();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAll_WithPaginationAndFilter_Returns200WithXTotalCount()
     {
@@ -54,6 +59,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
 
     // ── GET /api/parts/{id} ──────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetById_NonExistentId_Returns404NotFound()
     {
@@ -66,6 +72,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
 
     // ── POST /api/parts ──────────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Post_WithoutToken_Returns401Unauthorized()
     {
@@ -76,6 +83,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Post_WithMechanicToken_Returns403Forbidden()
     {
@@ -94,6 +102,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Post_WithAdminToken_ValidRequest_Returns201()
     {
@@ -122,6 +131,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
 
     // ── PUT /api/parts/{id} ──────────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Put_WithoutToken_Returns401Unauthorized()
     {
@@ -134,6 +144,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
 
     // ── DELETE /api/parts/{id} ───────────────────────────────────────
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Delete_WithoutToken_Returns401Unauthorized()
     {
@@ -144,6 +155,7 @@ public sealed class PartsControllerTests : IClassFixture<TestWebAppFactory>, IAs
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task Delete_NonExistentId_Returns404NotFound()
     {

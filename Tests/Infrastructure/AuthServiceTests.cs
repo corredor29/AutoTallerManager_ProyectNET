@@ -9,8 +9,10 @@ using Microsoft.Extensions.Options;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class AuthServiceTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task LoginAsync_ReturnsTokenAndRoles_WhenCredentialsAreValid()
     {
@@ -33,6 +35,7 @@ public sealed class AuthServiceTests
         Assert.True(response.ExpiresAtUtc > DateTime.UtcNow);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task LoginAsync_ThrowsUnauthorized_WhenUserDoesNotExist()
     {
@@ -49,6 +52,7 @@ public sealed class AuthServiceTests
         Assert.Equal("Invalid credentials.", exception.Message);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task LoginAsync_ThrowsUnauthorized_WhenPasswordIsInvalid()
     {
@@ -66,6 +70,7 @@ public sealed class AuthServiceTests
         Assert.Equal("Invalid credentials.", exception.Message);
     }
 
+    // Construye una instancia auxiliar para simplificar la preparacion del escenario.
     private static AuthService CreateService(FakeUserRepository repository)
     {
         var jwtOptions = Options.Create(new JwtOptions

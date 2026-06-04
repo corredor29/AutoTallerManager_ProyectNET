@@ -3,8 +3,10 @@ using Domain.ValueObject.Parts.ServiceOrderPart;
 
 namespace AutoTallerManager.Tests.Domain;
 
+// Conjunto de pruebas automatizadas para validar este comportamiento del sistema.
 public sealed class PartUnitPriceTests
 {
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void PartUnitPrice_ZeroValue_IsValid()
     {
@@ -12,6 +14,7 @@ public sealed class PartUnitPriceTests
         price.Value.Should().Be(0m);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void PartUnitPrice_PositiveValue_IsValid()
     {
@@ -19,6 +22,7 @@ public sealed class PartUnitPriceTests
         price.Value.Should().Be(99.99m);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void PartUnitPrice_NegativeValue_ThrowsArgumentException()
     {
@@ -27,6 +31,7 @@ public sealed class PartUnitPriceTests
            .WithMessage("*negative*");
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void ServiceOrderPartQuantity_ZeroOrNegative_ThrowsArgumentException()
     {
@@ -37,6 +42,7 @@ public sealed class PartUnitPriceTests
         actNeg.Should().Throw<ArgumentException>();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void ServiceOrderPartQuantity_PositiveValue_IsValid()
     {
@@ -44,6 +50,7 @@ public sealed class PartUnitPriceTests
         quantity.Value.Should().Be(3);
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void PartMinStock_NegativeValue_ThrowsArgumentException()
     {
@@ -51,6 +58,7 @@ public sealed class PartUnitPriceTests
         act.Should().Throw<ArgumentException>();
     }
 
+    // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public void PartCode_EmptyValue_ThrowsArgumentException()
     {
