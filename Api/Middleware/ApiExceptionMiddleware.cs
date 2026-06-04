@@ -4,11 +4,10 @@ using System.Text.Json;
 
 namespace Api.Middleware;
 
-// Funcion para manejar las excepciones de manera global en la aplicación, 
-//capturando cualquier excepción no manejada y devolviendo una respuesta 
-//JSON con detalles del error.
+// Middleware global que captura excepciones no controladas y devuelve un error JSON uniforme.
 public sealed class ApiExceptionMiddleware
 {
+    // Referencia al siguiente middleware del pipeline HTTP.
     private readonly RequestDelegate _next;
 
     public ApiExceptionMiddleware(RequestDelegate next)
@@ -16,8 +15,8 @@ public sealed class ApiExceptionMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context)  // Método principal que se ejecuta para cada solicitud, 
-                                                        // envolviendo la ejecución del siguiente middleware en un bloque try-catch para capturar cualquier excepción que ocurra durante el procesamiento de la solicitud.
+    // Envuelve la ejecucion del siguiente middleware para interceptar cualquier excepcion.
+    public async Task InvokeAsync(HttpContext context)
     {
         try
         {
@@ -29,7 +28,7 @@ public sealed class ApiExceptionMiddleware
         }
     }
 
-    // Función para mapear diferentes tipos de excepciones a códigos de estado HTTP y mensajes de error personalizados.
+    // Traduce excepciones conocidas a codigos HTTP y mensajes mas entendibles para el cliente.
     private static Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         var (statusCode, title) = exception switch
@@ -47,7 +46,8 @@ public sealed class ApiExceptionMiddleware
         {
             Success = false,
             Title = title,
-            Detail = exception.Message,      // Proporciona detalles específicos del error para ayudar a entender la causa del problema.
+            // Incluye el detalle original para ayudar a diagnosticar la causa del problema.
+            Detail = exception.Message,
             StatusCode = (int)statusCode,
             TraceId = context.TraceIdentifier
         });

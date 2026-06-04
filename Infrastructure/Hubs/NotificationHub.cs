@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Infrastructure.Hubs
 {
+    // Hub de SignalR protegido que sirve como punto de conexion para notificaciones en tiempo real.
     [Authorize]
     public sealed class NotificationHub : Hub { }
 }
