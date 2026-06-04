@@ -299,6 +299,10 @@ public sealed class ServiceOrderService : IServiceOrderService
             ? string.Empty
             : $"{order.Mechanic.Person.FirstName.Value} {order.Mechanic.Person.LastName.Value}".Trim();
 
+        var customerFullName = order.Appointment?.Customer?.Person is null
+            ? string.Empty
+            : $"{order.Appointment.Customer.Person.FirstName.Value} {order.Appointment.Customer.Person.LastName.Value}".Trim();
+
         var vehicleDisplayName = order.Vehicle?.Model is null
             ? string.Empty
             : $"{order.Vehicle.Model.Brand.BrandName.Value} {order.Vehicle.Model.ModelName.Value}".Trim();
@@ -306,6 +310,8 @@ public sealed class ServiceOrderService : IServiceOrderService
         return new ServiceOrderDto
         {
             Id                  = order.Id,
+            CustomerId          = order.Appointment?.CustomerId,
+            CustomerName        = customerFullName,
             VehicleId           = order.VehicleId,
             VehicleVin          = order.Vehicle?.VIN.Value         ?? string.Empty,
             VehicleDisplayName  = vehicleDisplayName,

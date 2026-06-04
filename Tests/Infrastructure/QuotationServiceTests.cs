@@ -8,7 +8,7 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class QuotationServiceTests
 {
     private static QuotationService CreateService(AutoTallerDbContext db) =>
-        new(new QuotationRepository(db), db);
+        new(new QuotationRepository(db), db, HubContextFactory.Create());
 
     private static async Task<(int quotationId, int serviceOrderId, int rejectedStatusId)>
         SeedScenarioAsync(AutoTallerDbContext db, decimal laborCost = 150m)

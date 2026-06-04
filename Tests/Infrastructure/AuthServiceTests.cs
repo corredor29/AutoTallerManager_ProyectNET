@@ -85,6 +85,6 @@ public sealed class AuthServiceTests
             new HttpContextAccessor()
         );
 
-        return new AuthService(repository, jwtOptions, dbContext);
+        return new AuthService(repository, jwtOptions, dbContext, HubContextFactory.Create());
     }
 }

@@ -16,7 +16,7 @@ public sealed class CustomerServiceTests
     }
 
     private static CustomerService CreateService(AutoTallerDbContext db) =>
-        new(new CustomerRepository(db), db);
+        new(new CustomerRepository(db), db, HubContextFactory.Create());
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ public sealed class CustomerServiceTests
         });
 
         result.Customer.Person.PrimaryEmail.Should().Be("laura.ruiz@gmail.com");
-        result.Customer.Person.PrimaryPhone.Should().Be("+57 3001234567");
+        result.Customer.Person.PrimaryPhone.Should().Be("3001234567");
         result.Vehicle.Vin.Should().Be("1HGCM82633A004399");
 
         db.VehicleOwnershipHistories.Should().ContainSingle(x => x.CustomerId == result.Customer.Id && x.VehicleId == result.Vehicle.Id);

@@ -7,7 +7,7 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class VehicleServiceTests
 {
     private static VehicleService CreateService(AutoTallerDbContext db) =>
-        new(new VehicleRepository(db), db);
+        new(new VehicleRepository(db), db, HubContextFactory.Create());
 
     // ── CreateAsync ──────────────────────────────────────────────────
 

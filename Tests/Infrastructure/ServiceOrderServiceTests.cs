@@ -18,7 +18,7 @@ public sealed class ServiceOrderServiceTests
     // ── helpers ─────────────────────────────────────────────────────
 
     private static ServiceOrderService CreateService(AutoTallerDbContext db) =>
-        new(new ServiceOrderRepository(db), db);
+        new(new ServiceOrderRepository(db), db, HubContextFactory.Create());
 
     private static async Task<(int vehicleId, int serviceTypeId, int mechanicId, int pendingStatusId)>
         SeedPrerequisitesAsync(AutoTallerDbContext db)
