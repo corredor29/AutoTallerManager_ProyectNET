@@ -143,7 +143,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // Redirige al frontend con el error si Google rechaza la autenticación.
         options.Events.OnRemoteFailure = ctx =>
         {
-            ctx.Response.Redirect($"http://127.0.0.1:5500/index.html?error={Uri.EscapeDataString(ctx.Failure?.Message ?? "Unknown")}");
+            ctx.Response.Redirect($"https://proyect-net-front.onrender.com/index.html?error={Uri.EscapeDataString(ctx.Failure?.Message ?? "Unknown")}");
             ctx.HandleResponse();
             return Task.CompletedTask;
         };
@@ -219,13 +219,14 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFront", policy =>
     {
-        // Autoriza los orígenes locales del frontend durante desarrollo.
+        // Autoriza los orígenes locales del frontend durante desarrollo y producción.
         policy
             .WithOrigins(
                 "http://localhost:5500",
                 "http://127.0.0.1:5500",
                 "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "https://proyect-net-front.onrender.com" // ← frontend en producción
             )
             .AllowAnyHeader()
             .AllowAnyMethod()

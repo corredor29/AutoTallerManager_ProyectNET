@@ -4,8 +4,11 @@ using Domain.Entities.Customers;
 using Domain.Entities.Persons;
 using Domain.ValueObject.Appointments.Appointment;
 using Domain.ValueObject.Persons.Person;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -13,8 +16,19 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class AppointmentServiceTests
 {
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static AppointmentService CreateService(AutoTallerDbContext db) =>
-        new(new AppointmentRepository(db), db);
+    private static AppointmentService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new AppointmentService(new AppointmentRepository(db), db, mockHub.Object);
+    }
 
     // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
@@ -50,13 +64,13 @@ public sealed class AppointmentServiceTests
 
         var act = () => service.CreateAsync(new CreateAppointmentRequest
         {
-            CustomerId = customer.Id,
-            VehicleId = vehicleId,
-            ServiceTypeId = serviceTypes.DiagnosticsId,
+            CustomerId          = customer.Id,
+            VehicleId           = vehicleId,
+            ServiceTypeId       = serviceTypes.DiagnosticsId,
             AppointmentStatusId = appointmentStatusId,
-            AssignedUserId = mechanicId,
-            AppointmentDate = appointmentDate.AddMinutes(30),
-            Notes = "Overlapping appointment"
+            AssignedUserId      = mechanicId,
+            AppointmentDate     = appointmentDate.AddMinutes(30),
+            Notes               = "Overlapping appointment"
         });
 
         await act.Should().ThrowAsync<InvalidOperationException>()

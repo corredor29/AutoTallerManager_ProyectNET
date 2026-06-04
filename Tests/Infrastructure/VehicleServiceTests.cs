@@ -1,6 +1,9 @@
 using Application.Requests.Vehicles;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -8,8 +11,19 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class VehicleServiceTests
 {
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static VehicleService CreateService(AutoTallerDbContext db) =>
-        new(new VehicleRepository(db), db);
+    private static VehicleService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new VehicleService(new VehicleRepository(db), db, mockHub.Object);
+    }
 
     // ── CreateAsync ──────────────────────────────────────────────────
 

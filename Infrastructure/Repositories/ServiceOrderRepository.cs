@@ -23,14 +23,14 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
         var query = _dbContext.ServiceOrders
             .Include(x => x.Vehicle)
                 .ThenInclude(x => x.Model)
-                    .ThenInclude(x => x.Brand)
+                    .ThenInclude(x => x!.Brand)
             .Include(x => x.Appointment)
-                .ThenInclude(x => x.Customer)
+                .ThenInclude(x => x!.Customer)
                     .ThenInclude(x => x.Person)
             .Include(x => x.ServiceType)
             .Include(x => x.OrderStatus)
             .Include(x => x.Mechanic)
-                .ThenInclude(x => x.Person)
+                .ThenInclude(x => x!.Person)
             .AsQueryable();
 
         query = query
@@ -74,14 +74,14 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
         return await _dbContext.ServiceOrders
             .Include(x => x.Vehicle)
                 .ThenInclude(x => x.Model)
-                    .ThenInclude(x => x.Brand)
+                    .ThenInclude(x => x!.Brand)
             .Include(x => x.Appointment)
-                .ThenInclude(x => x.Customer)
+                .ThenInclude(x => x!.Customer)
                     .ThenInclude(x => x.Person)
             .Include(x => x.ServiceType)
             .Include(x => x.OrderStatus)
             .Include(x => x.Mechanic)
-                .ThenInclude(x => x.Person)
+                .ThenInclude(x => x!.Person)
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
@@ -90,14 +90,14 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
         return await _dbContext.ServiceOrders
             .Include(x => x.Vehicle)
                 .ThenInclude(x => x.Model)
-                    .ThenInclude(x => x.Brand)
+                    .ThenInclude(x => x!.Brand)
             .Include(x => x.Appointment)
-                .ThenInclude(x => x.Customer)
+                .ThenInclude(x => x!.Customer)
                     .ThenInclude(x => x.Person)
             .Include(x => x.ServiceType)
             .Include(x => x.OrderStatus)
             .Include(x => x.Mechanic)
-                .ThenInclude(x => x.Person)
+                .ThenInclude(x => x!.Person)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
     }
@@ -114,9 +114,9 @@ public sealed class ServiceOrderRepository : IServiceOrderRepository
     {
         var allStatuses = await _dbContext.OrderStatuses.ToListAsync();
         var activeStatusIds = allStatuses
-            .Where(s => s.Name.Value.ToLower() == "pending" ||
-                        s.Name.Value.ToLower() == "in progress")
-            .Select(s => s.Id)
+            .Where(s => s!.Name.Value.ToLower() == "pending" ||
+                        s!.Name.Value.ToLower() == "in progress")
+            .Select(s => s!.Id)
             .ToList();
 
         return await _dbContext.ServiceOrders.AnyAsync(x =>

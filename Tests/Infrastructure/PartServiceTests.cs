@@ -3,8 +3,11 @@ using Application.Filters;
 using Application.Requests.Parts;
 using Domain.Entities.Parts;
 using Domain.ValueObject.Parts.Part;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -12,8 +15,19 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class PartServiceTests
 {
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static PartService CreateService(AutoTallerDbContext db) =>
-        new(new PartRepository(db), db);
+    private static PartService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new PartService(new PartRepository(db), db, mockHub.Object);
+    }
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
@@ -58,7 +72,7 @@ public sealed class PartServiceTests
 
         var act = () => service.CreateAsync(new CreatePartRequest
         {
-            PartCategoryId = categoryId, Code = "DUP-001",  // same code
+            PartCategoryId = categoryId, Code = "DUP-001",
             Description = "Second",      Stock = 5, MinStock = 1, UnitPrice = 10m
         });
 
@@ -112,10 +126,10 @@ public sealed class PartServiceTests
     [Fact]
     public async Task GetAllPagedAsync_FilterByCategory_ReturnsOnlyMatchingParts()
     {
-        var db         = DbContextFactory.Create();
-        var service    = CreateService(db);
-        var catA       = await SeedDataHelper.SeedPartCategoryAsync(db, "Category A");
-        var catB       = await SeedDataHelper.SeedPartCategoryAsync(db, "Category B");
+        var db      = DbContextFactory.Create();
+        var service = CreateService(db);
+        var catA    = await SeedDataHelper.SeedPartCategoryAsync(db, "Category A");
+        var catB    = await SeedDataHelper.SeedPartCategoryAsync(db, "Category B");
         await SeedDataHelper.SeedPartAsync(db, catA, "A-001");
         await SeedDataHelper.SeedPartAsync(db, catB, "B-001");
 
@@ -134,7 +148,7 @@ public sealed class PartServiceTests
         var db         = DbContextFactory.Create();
         var service    = CreateService(db);
         var categoryId = await SeedDataHelper.SeedPartCategoryAsync(db);
-        await SeedDataHelper.SeedPartAsync(db, categoryId, "OK-001", stock: 10, minStock: 2);
+        await SeedDataHelper.SeedPartAsync(db, categoryId, "OK-001",  stock: 10, minStock: 2);
         await SeedDataHelper.SeedPartAsync(db, categoryId, "LOW-001", stock: 1,  minStock: 5);
 
         var result = await service.GetAllPagedAsync(

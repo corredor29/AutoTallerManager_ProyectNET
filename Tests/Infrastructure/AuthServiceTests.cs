@@ -2,10 +2,14 @@ using Application.Requests.Auth;
 using AutoTallerManager.Tests.Fakes;
 using AutoTallerManager.Tests.Helpers;
 using Infrastructure.Context;
+using Infrastructure.Hubs;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -90,6 +94,21 @@ public sealed class AuthServiceTests
             new HttpContextAccessor()
         );
 
-        return new AuthService(repository, jwtOptions, dbContext);
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Mock de IConfiguration para proveer el Google ClientId en tests.
+        var mockConfig = new Mock<IConfiguration>();
+        mockConfig
+            .Setup(c => c["Google:ClientId"])
+            .Returns("test-client-id");
+
+        return new AuthService(repository, jwtOptions, dbContext, mockHub.Object, mockConfig.Object);
     }
 }

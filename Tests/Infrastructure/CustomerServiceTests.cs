@@ -1,10 +1,13 @@
+using Application.Mapping;
 using Application.Requests.Customers;
+using Domain.ValueObject.Persons.PhoneCode;
+using Domain.Entities.Persons;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Mapster;
-using Application.Mapping;
-using Domain.Entities.Persons;
-using Domain.ValueObject.Persons.PhoneCode;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -17,8 +20,19 @@ public sealed class CustomerServiceTests
     }
 
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static CustomerService CreateService(AutoTallerDbContext db) =>
-        new(new CustomerRepository(db), db);
+    private static CustomerService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new CustomerService(new CustomerRepository(db), db, mockHub.Object);
+    }
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
@@ -50,7 +64,7 @@ public sealed class CustomerServiceTests
         var db      = DbContextFactory.Create();
         var service = CreateService(db);
 
-        var c1 = await service.CreateAsync(new CreateCustomerRequest { FirstName = "Ana", LastName = "López" });
+        var c1 = await service.CreateAsync(new CreateCustomerRequest { FirstName = "Ana",  LastName = "López" });
         var c2 = await service.CreateAsync(new CreateCustomerRequest { FirstName = "Luis", LastName = "Pérez" });
 
         c1.Id.Should().NotBe(c2.Id);
@@ -60,7 +74,7 @@ public sealed class CustomerServiceTests
     [Fact]
     public async Task RegisterWithVehicleAsync_ValidRequest_CreatesCustomerContactAndVehicle()
     {
-        var db = DbContextFactory.Create();
+        var db      = DbContextFactory.Create();
         var service = CreateService(db);
         var (_, modelId) = await SeedDataHelper.SeedVehicleModelAsync(db);
 
@@ -70,17 +84,17 @@ public sealed class CustomerServiceTests
 
         var result = await service.RegisterWithVehicleAsync(new RegisterCustomerWithVehicleRequest
         {
-            FirstName = "Laura",
-            LastName = "Ruiz",
-            Email = "laura.ruiz@gmail.com",
+            FirstName   = "Laura",
+            LastName    = "Ruiz",
+            Email       = "laura.ruiz@gmail.com",
             PhoneCodeId = phoneCode.Id,
             PhoneNumber = "3001234567",
-            Vehicle = new RegisterVehicleRequest
+            Vehicle     = new RegisterVehicleRequest
             {
-                ModelId = modelId,
-                Vin = "1HGCM82633A004399",
-                Year = 2022,
-                Mileage = 12000,
+                ModelId      = modelId,
+                Vin          = "1HGCM82633A004399",
+                Year         = 2022,
+                Mileage      = 12000,
                 LicensePlate = "ABC123"
             }
         });
@@ -89,7 +103,8 @@ public sealed class CustomerServiceTests
         result.Customer.Person.PrimaryPhone.Should().Be("+57 3001234567");
         result.Vehicle.Vin.Should().Be("1HGCM82633A004399");
 
-        db.VehicleOwnershipHistories.Should().ContainSingle(x => x.CustomerId == result.Customer.Id && x.VehicleId == result.Vehicle.Id);
+        db.VehicleOwnershipHistories.Should().ContainSingle(x =>
+            x.CustomerId == result.Customer.Id && x.VehicleId == result.Vehicle.Id);
     }
 
     // ── DeleteAsync ──────────────────────────────────────────────────
@@ -113,18 +128,16 @@ public sealed class CustomerServiceTests
         var db      = DbContextFactory.Create();
         var service = CreateService(db);
 
-        // Create the customer
         var customer = await service.CreateAsync(new CreateCustomerRequest
         {
             FirstName = "Pedro",
             LastName  = "Ramírez"
         });
 
-        // Seed prerequisites for Appointment
-        var statuses         = await SeedDataHelper.SeedOrderStatusesAsync(db);
-        var serviceTypes     = await SeedDataHelper.SeedServiceTypesAsync(db);
-        var (_, modelId)     = await SeedDataHelper.SeedVehicleModelAsync(db);
-        var vehicleId        = await SeedDataHelper.SeedVehicleAsync(db, modelId);
+        var statuses            = await SeedDataHelper.SeedOrderStatusesAsync(db);
+        var serviceTypes        = await SeedDataHelper.SeedServiceTypesAsync(db);
+        var (_, modelId)        = await SeedDataHelper.SeedVehicleModelAsync(db);
+        var vehicleId           = await SeedDataHelper.SeedVehicleAsync(db, modelId);
         var appointmentStatusId = await SeedDataHelper.SeedAppointmentStatusPendingAsync(db);
 
         await SeedDataHelper.SeedAppointmentAsync(

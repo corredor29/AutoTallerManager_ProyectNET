@@ -8,8 +8,11 @@ using Domain.Entities.ServiceOrders;
 using Domain.ValueObject.Appointments.Appointment;
 using Domain.ValueObject.Persons.Person;
 using Domain.ValueObject.ServiceOrders.ServiceOrder;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -19,8 +22,19 @@ public sealed class ServiceOrderServiceTests
     // ── helpers ─────────────────────────────────────────────────────
 
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static ServiceOrderService CreateService(AutoTallerDbContext db) =>
-        new(new ServiceOrderRepository(db), db);
+    private static ServiceOrderService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new ServiceOrderService(new ServiceOrderRepository(db), db, mockHub.Object);
+    }
 
     private static async Task<(int vehicleId, int serviceTypeId, int mechanicId, int pendingStatusId)>
         SeedPrerequisitesAsync(AutoTallerDbContext db)
@@ -96,7 +110,7 @@ public sealed class ServiceOrderServiceTests
         var before  = DateTime.UtcNow;
 
         var result = await service.CreateAsync(
-            BuildRequest(vehicleId, serviceTypeId, mechanicId, pendingId));  // EstimatedDeliveryAt = null
+            BuildRequest(vehicleId, serviceTypeId, mechanicId, pendingId));
 
         result.EstimatedDeliveryAt.Should().NotBeNull();
         result.EstimatedDeliveryAt!.Value.Should().BeAfter(before.AddHours(1));
@@ -219,14 +233,14 @@ public sealed class ServiceOrderServiceTests
     [Fact]
     public async Task GetAllPagedAsync_FilterByCustomerId_ReturnsOnlyMatchingOrders()
     {
-        var db = DbContextFactory.Create();
-        var service = CreateService(db);
-        var statuses = await SeedDataHelper.SeedOrderStatusesAsync(db);
+        var db                  = DbContextFactory.Create();
+        var service             = CreateService(db);
+        var statuses            = await SeedDataHelper.SeedOrderStatusesAsync(db);
         var appointmentStatusId = await SeedDataHelper.SeedAppointmentStatusPendingAsync(db);
-        var serviceTypes = await SeedDataHelper.SeedServiceTypesAsync(db);
-        var (_, modelId) = await SeedDataHelper.SeedVehicleModelAsync(db);
-        var vehicleId = await SeedDataHelper.SeedVehicleAsync(db, modelId);
-        var (_, mechanicId) = await SeedDataHelper.SeedMechanicAsync(db);
+        var serviceTypes        = await SeedDataHelper.SeedServiceTypesAsync(db);
+        var (_, modelId)        = await SeedDataHelper.SeedVehicleModelAsync(db);
+        var vehicleId           = await SeedDataHelper.SeedVehicleAsync(db, modelId);
+        var (_, mechanicId)     = await SeedDataHelper.SeedMechanicAsync(db);
 
         var personA = new Person(new PersonFirstName("Paula"), new PersonLastName("Lopez"));
         var personB = new Person(new PersonFirstName("Diego"), new PersonLastName("Rios"));

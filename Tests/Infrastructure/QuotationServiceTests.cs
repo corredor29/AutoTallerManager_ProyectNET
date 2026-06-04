@@ -1,7 +1,10 @@
 using Application.Requests.Quotations;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -9,17 +12,28 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class QuotationServiceTests
 {
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static QuotationService CreateService(AutoTallerDbContext db) =>
-        new(new QuotationRepository(db), db);
+    private static QuotationService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new QuotationService(new QuotationRepository(db), db, mockHub.Object);
+    }
 
     private static async Task<(int quotationId, int serviceOrderId, int rejectedStatusId)>
         SeedScenarioAsync(AutoTallerDbContext db, decimal laborCost = 150m)
     {
-        var statuses         = await SeedDataHelper.SeedOrderStatusesAsync(db);
-        var serviceTypes     = await SeedDataHelper.SeedServiceTypesAsync(db);
-        var (_, modelId)     = await SeedDataHelper.SeedVehicleModelAsync(db);
-        var vehicleId        = await SeedDataHelper.SeedVehicleAsync(db, modelId);
-        var (_, mechanicId)  = await SeedDataHelper.SeedMechanicAsync(db);
+        var statuses          = await SeedDataHelper.SeedOrderStatusesAsync(db);
+        var serviceTypes      = await SeedDataHelper.SeedServiceTypesAsync(db);
+        var (_, modelId)      = await SeedDataHelper.SeedVehicleModelAsync(db);
+        var vehicleId         = await SeedDataHelper.SeedVehicleAsync(db, modelId);
+        var (_, mechanicId)   = await SeedDataHelper.SeedMechanicAsync(db);
         var quotationStatuses = await SeedDataHelper.SeedQuotationStatusesAsync(db);
 
         var serviceOrderId = await SeedDataHelper.SeedServiceOrderAsync(
@@ -37,11 +51,11 @@ public sealed class QuotationServiceTests
     [Fact]
     public async Task ChangeStatusAsync_Accept_ChangesStatusToAccepted()
     {
-        var db      = DbContextFactory.Create();
-        var service = CreateService(db);
-        var (quotationId, _, _)    = await SeedScenarioAsync(db);
-        var statuses               = await db.QuotationStatuses.ToListAsync();
-        var acceptedId             = statuses.First(s => s.Name.Value == "Accepted").Id;
+        var db                  = DbContextFactory.Create();
+        var service             = CreateService(db);
+        var (quotationId, _, _) = await SeedScenarioAsync(db);
+        var statuses            = await db.QuotationStatuses.ToListAsync();
+        var acceptedId          = statuses.First(s => s.Name.Value == "Accepted").Id;
 
         var result = await service.ChangeStatusAsync(
             quotationId,
@@ -60,8 +74,8 @@ public sealed class QuotationServiceTests
     [Fact]
     public async Task ChangeStatusAsync_Reject_ChangesStatusAndCreatesDiagnosisOnlyInvoice()
     {
-        var db                             = DbContextFactory.Create();
-        var service                        = CreateService(db);
+        var db                                        = DbContextFactory.Create();
+        var service                                   = CreateService(db);
         var (quotationId, serviceOrderId, rejectedId) = await SeedScenarioAsync(db, laborCost: 200m);
 
         var result = await service.ChangeStatusAsync(
@@ -88,8 +102,8 @@ public sealed class QuotationServiceTests
     [Fact]
     public async Task ChangeStatusAsync_Reject_ServiceOrderAlreadyHasInvoice_DoesNotDuplicateInvoice()
     {
-        var db                             = DbContextFactory.Create();
-        var service                        = CreateService(db);
+        var db                                        = DbContextFactory.Create();
+        var service                                   = CreateService(db);
         var (quotationId, serviceOrderId, rejectedId) = await SeedScenarioAsync(db);
 
         // Reject once — creates the invoice
@@ -121,11 +135,11 @@ public sealed class QuotationServiceTests
     [Fact]
     public async Task ChangeStatusAsync_QuotationNotFound_ReturnsFalse()
     {
-        var db      = DbContextFactory.Create();
-        var service = CreateService(db);
+        var db         = DbContextFactory.Create();
+        var service    = CreateService(db);
         await SeedDataHelper.SeedQuotationStatusesAsync(db);
-        var statuses    = await db.QuotationStatuses.ToListAsync();
-        var acceptedId  = statuses.First(s => s.Name.Value == "Accepted").Id;
+        var statuses   = await db.QuotationStatuses.ToListAsync();
+        var acceptedId = statuses.First(s => s.Name.Value == "Accepted").Id;
 
         var result = await service.ChangeStatusAsync(
             9999,

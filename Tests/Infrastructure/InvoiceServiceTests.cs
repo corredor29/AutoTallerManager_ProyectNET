@@ -8,8 +8,11 @@ using Domain.Entities.ServiceOrders;
 using Domain.ValueObject.Appointments.Appointment;
 using Domain.ValueObject.Persons.Person;
 using Domain.ValueObject.ServiceOrders.ServiceOrder;
+using Infrastructure.Hubs;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Microsoft.AspNetCore.SignalR;
+using Moq;
 
 namespace AutoTallerManager.Tests.Infrastructure;
 
@@ -17,22 +20,33 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class InvoiceServiceTests
 {
     // Construye una instancia auxiliar para simplificar la preparacion del escenario.
-    private static InvoiceService CreateService(AutoTallerDbContext db) =>
-        new(new InvoiceRepository(db), db);
+    private static InvoiceService CreateService(AutoTallerDbContext db)
+    {
+        // Mock del hub de SignalR — no necesita hacer nada real en los tests.
+        var mockHub = new Mock<IHubContext<NotificationHub>>();
+        mockHub
+            .Setup(h => h.Clients.All.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        return new InvoiceService(new InvoiceRepository(db), db, mockHub.Object);
+    }
 
     // Verifica el escenario cubierto por este caso de prueba.
     [Fact]
     public async Task GetAllPagedAsync_FilterByCustomerId_ReturnsOnlyMatchingInvoices()
     {
-        var db = DbContextFactory.Create();
-        var service = CreateService(db);
-        var statuses = await SeedDataHelper.SeedOrderStatusesAsync(db);
+        var db                  = DbContextFactory.Create();
+        var service             = CreateService(db);
+        var statuses            = await SeedDataHelper.SeedOrderStatusesAsync(db);
         var appointmentStatusId = await SeedDataHelper.SeedAppointmentStatusPendingAsync(db);
-        var serviceTypes = await SeedDataHelper.SeedServiceTypesAsync(db);
-        var (_, modelId) = await SeedDataHelper.SeedVehicleModelAsync(db);
-        var vehicleAId = await SeedDataHelper.SeedVehicleAsync(db, modelId, "1HGCM82633A004510");
-        var vehicleBId = await SeedDataHelper.SeedVehicleAsync(db, modelId, "1HGCM82633A004511");
-        var (_, mechanicId) = await SeedDataHelper.SeedMechanicAsync(db);
+        var serviceTypes        = await SeedDataHelper.SeedServiceTypesAsync(db);
+        var (_, modelId)        = await SeedDataHelper.SeedVehicleModelAsync(db);
+        var vehicleAId          = await SeedDataHelper.SeedVehicleAsync(db, modelId, "1HGCM82633A004510");
+        var vehicleBId          = await SeedDataHelper.SeedVehicleAsync(db, modelId, "1HGCM82633A004511");
+        var (_, mechanicId)     = await SeedDataHelper.SeedMechanicAsync(db);
 
         var personA = new Person(new PersonFirstName("Laura"), new PersonLastName("Mendez"));
         var personB = new Person(new PersonFirstName("Tomas"), new PersonLastName("Vega"));
@@ -91,15 +105,15 @@ public sealed class InvoiceServiceTests
         await service.CreateAsync(new CreateInvoiceRequest
         {
             ServiceOrderId = orderA.Id,
-            LaborCost = 100m,
-            Tax = 19m
+            LaborCost      = 100m,
+            Tax            = 19m
         });
 
         await service.CreateAsync(new CreateInvoiceRequest
         {
             ServiceOrderId = orderB.Id,
-            LaborCost = 200m,
-            Tax = 38m
+            LaborCost      = 200m,
+            Tax            = 38m
         });
 
         var result = await service.GetAllPagedAsync(
