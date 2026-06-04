@@ -56,7 +56,7 @@ namespace Api.Controllers
 
     // Crea un nuevo registro a partir de los datos enviados en el body.
         [HttpPost]
-        [Authorize(Roles = AppRoles.AdminOrMechanic)]
+        [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> Create([FromBody] CreateMileageHistoryRequest request)
         {
             var mileageHistory = await _mileageHistoryService.CreateAsync(request);
@@ -65,7 +65,7 @@ namespace Api.Controllers
 
     // Actualiza un registro existente identificado por su id.
         [HttpPut("{id:int}")]
-        [Authorize(Roles = AppRoles.AdminOrMechanic)]
+        [Authorize(Roles = AppRoles.Staff)]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateMileageHistoryRequest request)
         {
             var updated = await _mileageHistoryService.UpdateAsync(id, request);

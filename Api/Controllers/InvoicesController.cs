@@ -10,7 +10,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = AppRoles.AdminOrMechanic)]
+[Authorize(Roles = AppRoles.Staff)]
 // Controlador que expone los endpoints principales del modulo Invoices.
 public sealed class InvoicesController : ControllerBase
 {

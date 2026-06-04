@@ -59,7 +59,7 @@ public sealed class ServiceOrdersController : ControllerBase
 
     // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
-    [Authorize(Roles = AppRoles.AdminOrMechanic)]
+    [Authorize(Roles = AppRoles.Staff)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateServiceOrderRequest request)
     {
         var updated = await _serviceOrderService.UpdateAsync(id, request);
@@ -73,7 +73,7 @@ public sealed class ServiceOrdersController : ControllerBase
 
     // Cambia el estado del registro usando una solicitud especifica.
     [HttpPut("{id:int}/status")]
-    [Authorize(Roles = AppRoles.AdminOrMechanic)]
+    [Authorize(Roles = AppRoles.Staff)]
     public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeServiceOrderStatusRequest request)
     {
         var updated = await _serviceOrderService.ChangeStatusAsync(id, request);
