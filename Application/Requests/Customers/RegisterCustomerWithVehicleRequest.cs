@@ -41,7 +41,7 @@ public sealed class RegisterVehicleRequest
     [StringLength(17, MinimumLength = 17)]
     public string Vin { get; init; } = string.Empty;
 
-    [Range(1886, short.MaxValue)]
+    [Range(1886, 2026)]
     public short Year { get; init; }
 
     [Range(0, int.MaxValue)]

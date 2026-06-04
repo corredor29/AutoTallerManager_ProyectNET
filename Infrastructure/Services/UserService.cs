@@ -31,6 +31,23 @@ public sealed class UserService : IUserService
         return users.Select(MapToDto);
     }
 
+    public async Task<IEnumerable<UserDto>> GetActiveMechanicsAsync()
+    {
+        var activeUsers = await _dbContext.Users
+            .Include(x => x.Person)
+            .Include(x => x.UserRoles)
+                .ThenInclude(x => x.Role)
+            .Where(x => x.IsActive)
+            .ToListAsync();
+
+        var mechanics = activeUsers
+            .Where(x => x.UserRoles.Any(ur => ur.Role.RoleName.Value == "Mechanic"))
+            .OrderBy(x => x.Person.FirstName.Value)
+            .ThenBy(x => x.Person.LastName.Value);
+
+        return mechanics.Select(MapToDto);
+    }
+
     public async Task<UserDto?> GetByIdAsync(int id)
     {
         var user = await _userRepository.GetByIdAsync(id);

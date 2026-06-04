@@ -1,3 +1,4 @@
+using Api.Security;
 using Application.Contracts.Services;
 using Application.Requests.Users;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,6 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
 // Controlador que expone los endpoints principales del modulo Users.
 public sealed class UsersController : ControllerBase
 {
@@ -21,14 +21,25 @@ public sealed class UsersController : ControllerBase
 
 // Obtiene la lista completa del recurso manejado por este controlador.
     [HttpGet]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> GetAll()
     {
         var users = await _userService.GetAllAsync();
         return Ok(users);
     }
 
+// Devuelve solo mecanicos activos para pantallas de asignacion.
+    [HttpGet("mechanics")]
+    [Authorize(Roles = AppRoles.Staff)]
+    public async Task<IActionResult> GetMechanics()
+    {
+        var users = await _userService.GetActiveMechanicsAsync();
+        return Ok(users);
+    }
+
 // Busca un registro puntual por su identificador.
     [HttpGet("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> GetById(int id)
     {
         var user = await _userService.GetByIdAsync(id);
@@ -42,6 +53,7 @@ public sealed class UsersController : ControllerBase
 
 // Crea un nuevo registro a partir de los datos enviados en el body.
     [HttpPost]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest request)
     {
         var user = await _userService.CreateAsync(request);
@@ -50,6 +62,7 @@ public sealed class UsersController : ControllerBase
 
 // Actualiza un registro existente identificado por su id.
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateUserRequest request)
     {
         var updated = await _userService.UpdateAsync(id, request);
@@ -63,6 +76,7 @@ public sealed class UsersController : ControllerBase
 
 // Activa el usuario para permitir nuevamente su uso en el sistema.
     [HttpPut("{id:int}/activate")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Activate(int id)
     {
         var updated = await _userService.ActivateAsync(id);
@@ -76,6 +90,7 @@ public sealed class UsersController : ControllerBase
 
 // Desactiva el usuario para bloquear su uso sin borrarlo.
     [HttpPut("{id:int}/deactivate")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Deactivate(int id)
     {
         var updated = await _userService.DeactivateAsync(id);
@@ -89,6 +104,7 @@ public sealed class UsersController : ControllerBase
 
 // Elimina el registro indicado si existe.
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var removed = await _userService.DeleteAsync(id);
