@@ -12,10 +12,12 @@ using Domain.ValueObject.Persons.EmailDomain;
 using Domain.ValueObject.Persons.Person;
 using Domain.ValueObject.Persons.PersonEmail;
 using Domain.ValueObject.Users.User;
+using Google.Apis.Auth;
 using Infrastructure.Context;
 using Infrastructure.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -31,17 +33,21 @@ namespace Infrastructure.Services
         private readonly AutoTallerDbContext          _dbContext;
         // Hub usado para enviar notificaciones en tiempo real al frontend.
         private readonly IHubContext<NotificationHub> _hub;
+        // Client ID de Google usado para validar el ID token recibido del frontend.
+        private readonly string                      _googleClientId;
 
         public AuthService(
             IUserRepository userRepository,
             IOptions<JwtOptions> jwtOptions,
             AutoTallerDbContext dbContext,
-            IHubContext<NotificationHub> hub)
+            IHubContext<NotificationHub> hub,
+            IConfiguration configuration)
         {
             _userRepository = userRepository;
             _jwtOptions     = jwtOptions.Value;
             _dbContext      = dbContext;
             _hub            = hub;
+            _googleClientId = configuration["Google:ClientId"]!;
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginRequest request)
@@ -200,6 +206,147 @@ namespace Infrastructure.Services
             {
                 Email    = request.Email,
                 Password = request.Password
+            });
+        }
+
+        public async Task<AuthResponseDto> LoginWithGoogleAsync(GoogleLoginRequest request)
+        {
+            // Divide el correo de Google para buscarlo con el modelo usuario/dominio.
+            var emailParts  = request.Email.Trim().ToLowerInvariant()
+                                .Split('@', StringSplitOptions.RemoveEmptyEntries);
+            var emailUser   = emailParts[0];
+            var emailDomain = emailParts[1];
+
+            // Verifica si el usuario ya existe en el sistema por su correo de Google.
+            var user = await _userRepository.GetByPrimaryEmailAsync(emailUser, emailDomain);
+
+            if (user is null)
+            {
+                // Si es la primera vez que entra con Google, se crea su cuenta automáticamente.
+                var allDomains   = await _dbContext.EmailDomains.ToListAsync();
+                var domainEntity = allDomains.FirstOrDefault(d => d.Domain.Value == emailDomain);
+
+                if (domainEntity is null)
+                {
+                    // El dominio de Google se registra si no existía previamente.
+                    domainEntity = new EmailDomain(new EmailDomainValue(emailDomain));
+                    await _dbContext.EmailDomains.AddAsync(domainEntity);
+                    await _dbContext.SaveChangesAsync();
+                }
+
+                // La persona se crea con el nombre que devuelve Google.
+                var person = new Person(
+                    new PersonFirstName(request.FirstName),
+                    new PersonLastName(request.LastName));
+
+                await _dbContext.Persons.AddAsync(person);
+                await _dbContext.SaveChangesAsync();
+
+                var personEmail = new PersonEmail(
+                    person.Id, domainEntity.Id, new EmailUser(emailUser), true);
+                await _dbContext.PersonEmails.AddAsync(personEmail);
+
+                // La contraseña aleatoria es necesaria por el modelo pero nunca se usa
+                // porque el usuario siempre se autenticará a través de Google.
+                var passwordHash = new PasswordHash(BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()));
+                user = new User(person.Id, passwordHash);
+                await _dbContext.Users.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+
+                // Los usuarios de Google reciben Receptionist por defecto.
+                var allRoles         = await _dbContext.Roles.ToListAsync();
+                var receptionistRole = allRoles.FirstOrDefault(r => r.RoleName.Value == "Receptionist")
+                    ?? throw new InvalidOperationException("Receptionist role not found.");
+
+                await _dbContext.UserRoles.AddAsync(new UserRole(user.Id, receptionistRole.Id));
+                await _dbContext.SaveChangesAsync();
+
+                // Informa al sistema que se registró un usuario nuevo vía Google.
+                await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+                {
+                    Type       = "create",
+                    Entity     = "User",
+                    RecordId   = user.Id,
+                    Message    = $"New user {request.FirstName} {request.LastName} registered via Google",
+                    OccurredAt = DateTime.UtcNow
+                });
+            }
+
+            // Si la cuenta está desactivada, se bloquea el acceso aunque Google lo valide.
+            if (!user.IsActive)
+                throw new UnauthorizedAccessException("Your account is inactive.");
+
+            // Genera el JWT con los mismos claims que el login normal.
+            var roles = user.UserRoles
+                .Select(x => x.Role.RoleName.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtOptions.ExpirationMinutes);
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var securityKey  = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
+
+            var claims = new List<Claim>
+            {
+                new(JwtRegisteredClaimNames.Sub,        user.Id.ToString()),
+                new(JwtRegisteredClaimNames.UniqueName, user.Id.ToString()),
+                new("personId",                         user.PersonId.ToString()),
+                new(JwtRegisteredClaimNames.GivenName,  user.Person.FirstName.Value),
+                new(JwtRegisteredClaimNames.FamilyName, user.Person.LastName.Value)
+            };
+
+            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+            var descriptor = new SecurityTokenDescriptor
+            {
+                Subject            = new ClaimsIdentity(claims),
+                Expires            = expiresAtUtc,
+                Issuer             = _jwtOptions.Issuer,
+                Audience           = _jwtOptions.Audience,
+                SigningCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature)
+            };
+
+            var token    = tokenHandler.CreateToken(descriptor);
+            var fullName = $"{user.Person.FirstName.Value} {user.Person.LastName.Value}".Trim();
+
+            // Registra el evento de login con Google en el panel de notificaciones.
+            await _hub.Clients.All.SendAsync("Notification", new NotificationDto
+            {
+                Type       = "login",
+                Entity     = "User",
+                RecordId   = user.Id,
+                Message    = $"{fullName} logged in via Google",
+                OccurredAt = DateTime.UtcNow
+            });
+
+            return new AuthResponseDto
+            {
+                Token        = tokenHandler.WriteToken(token),
+                ExpiresAtUtc = expiresAtUtc,
+                UserId       = user.Id,
+                PersonId     = user.PersonId,
+                FullName     = fullName,
+                Roles        = roles
+            };
+        }
+
+        public async Task<AuthResponseDto> LoginWithGoogleTokenAsync(string idToken)
+        {
+            // Valida el ID token usando la librería oficial de Google.
+            // Si el token es inválido o expiró, Google lanza una excepción.
+            var payload = await GoogleJsonWebSignature.ValidateAsync(idToken,
+                new GoogleJsonWebSignature.ValidationSettings
+                {
+                    // El audience debe coincidir con el Client ID registrado en Google Console.
+                    Audience = new[] { _googleClientId }
+                });
+
+            // Extrae los datos del perfil del token validado y reutiliza el flujo de Google.
+            return await LoginWithGoogleAsync(new GoogleLoginRequest
+            {
+                Email     = payload.Email,
+                FirstName = payload.GivenName  ?? "Google",
+                LastName  = payload.FamilyName ?? "User"
             });
         }
     }

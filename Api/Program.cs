@@ -15,6 +15,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,6 +109,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.Key))
     throw new InvalidOperationException("JWT signing key is missing.");
 
 // Habilita autenticación bearer usando JWT firmado con clave simétrica.
+// También registra cookies para el flujo OAuth de Google y Google OAuth.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -121,6 +123,29 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience            = jwtOptions.Audience,
             IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
             ClockSkew                = TimeSpan.Zero
+        };
+    })
+    .AddCookie("Cookies", options =>
+    {
+        // Permite que la cookie funcione en flujos OAuth cross-origin en desarrollo.
+        options.Cookie.SameSite     = SameSiteMode.None;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    })
+    .AddGoogle(options =>
+    {
+        // Credenciales de Google OAuth configuradas en appsettings.json.
+        options.ClientId     = builder.Configuration["Google:ClientId"]!;
+        options.ClientSecret = builder.Configuration["Google:ClientSecret"]!;
+        options.CallbackPath = "/api/Auth/google-callback";
+        // La cookie temporal de estado OAuth se almacena bajo el esquema Cookies.
+        options.SignInScheme = "Cookies";
+
+        // Redirige al frontend con el error si Google rechaza la autenticación.
+        options.Events.OnRemoteFailure = ctx =>
+        {
+            ctx.Response.Redirect($"http://127.0.0.1:5500/index.html?error={Uri.EscapeDataString(ctx.Failure?.Message ?? "Unknown")}");
+            ctx.HandleResponse();
+            return Task.CompletedTask;
         };
     });
 
@@ -205,7 +230,7 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials()
-            .WithExposedHeaders("Retry-After"); 
+            .WithExposedHeaders("Retry-After");
     });
 });
 
@@ -235,10 +260,11 @@ if (app.Environment.IsDevelopment())
 
 // Captura excepciones no controladas y las transforma en respuestas manejables.
 app.UseMiddleware<ApiExceptionMiddleware>();
-app.UseCors("AllowFront");
-app.UseHttpsRedirection();
-app.UseRateLimiter();
+// UseAuthentication debe ir antes de UseCors para que las cookies OAuth funcionen.
 app.UseAuthentication();
+app.UseCors("AllowFront");
+// app.UseHttpsRedirection(); // deshabilitado en desarrollo para permitir OAuth por HTTP
+app.UseRateLimiter();
 app.UseAuthorization();
 // Expone el hub de SignalR para notificaciones del sistema.
 app.MapHub<Infrastructure.Hubs.NotificationHub>("/hubs/notifications");
