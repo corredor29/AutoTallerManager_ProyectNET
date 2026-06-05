@@ -16,7 +16,7 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class InvoiceServiceTests
 {
     private static InvoiceService CreateService(AutoTallerDbContext db) =>
-        new(new InvoiceRepository(db), db);
+        new(new InvoiceRepository(db), db, HubContextFactory.Create());
 
     [Fact]
     public async Task GetAllPagedAsync_FilterByCustomerId_ReturnsOnlyMatchingInvoices()

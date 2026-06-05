@@ -12,7 +12,7 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class AppointmentServiceTests
 {
     private static AppointmentService CreateService(AutoTallerDbContext db) =>
-        new(new AppointmentRepository(db), db);
+        new(new AppointmentRepository(db), db, HubContextFactory.Create());
 
     [Fact]
     public async Task CreateAsync_MechanicHasConflictingAppointment_ThrowsInvalidOperationException()

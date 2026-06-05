@@ -11,7 +11,7 @@ namespace AutoTallerManager.Tests.Infrastructure;
 public sealed class PartServiceTests
 {
     private static PartService CreateService(AutoTallerDbContext db) =>
-        new(new PartRepository(db), db);
+        new(new PartRepository(db), db, HubContextFactory.Create());
 
     // ── CreateAsync ──────────────────────────────────────────────────
 
