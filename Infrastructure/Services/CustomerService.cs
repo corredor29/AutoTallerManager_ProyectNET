@@ -59,6 +59,35 @@ namespace Infrastructure.Services
 
         public async Task<CustomerDto> CreateAsync(CreateCustomerRequest request)
         {
+            var normalizedEmail          = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+            var normalizedPhone          = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+            var normalizedDocumentNumber = string.IsNullOrWhiteSpace(request.DocumentNumber) ? null : request.DocumentNumber.Trim();
+
+            if (request.DocumentTypeId.HasValue != (normalizedDocumentNumber is not null))
+                throw new ArgumentException("Document type and document number must be provided together.");
+
+            string? emailUser = null;
+            string? emailDomainValue = null;
+
+            if (normalizedEmail is not null)
+            {
+                (emailUser, emailDomainValue) = ParseEmail(normalizedEmail);
+                await EnsureEmailIsAvailableAsync(emailUser, emailDomainValue);
+            }
+
+            int? phoneCodeId = null;
+            if (normalizedPhone is not null)
+            {
+                phoneCodeId = await GetDefaultPhoneCodeIdAsync();
+                await EnsurePhoneIsAvailableAsync(phoneCodeId.Value, normalizedPhone);
+            }
+
+            if (request.DocumentTypeId.HasValue && normalizedDocumentNumber is not null)
+            {
+                await EnsureDocumentTypeExistsAsync(request.DocumentTypeId.Value);
+                await EnsureDocumentIsAvailableAsync(request.DocumentTypeId.Value, normalizedDocumentNumber);
+            }
+
             var person = new Person(
                 new PersonFirstName(request.FirstName),
                 new PersonLastName(request.LastName));
@@ -66,30 +95,23 @@ namespace Infrastructure.Services
             await _dbContext.Persons.AddAsync(person);
             await _dbContext.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(request.Email))
+            if (emailUser is not null && emailDomainValue is not null)
             {
-                var parts = request.Email.Trim().ToLowerInvariant().Split('@');
-                if (parts.Length == 2)
-                {
-                    var domain = await GetOrCreateEmailDomainAsync(parts[1]);
-                    await _dbContext.PersonEmails.AddAsync(
-                        new PersonEmail(person.Id, domain.Id, new EmailUser(parts[0]), true));
-                }
+                var domain = await GetOrCreateEmailDomainAsync(emailDomainValue);
+                await _dbContext.PersonEmails.AddAsync(
+                    new PersonEmail(person.Id, domain.Id, new EmailUser(emailUser), true));
             }
 
-            if (!string.IsNullOrWhiteSpace(request.Phone))
+            if (normalizedPhone is not null && phoneCodeId.HasValue)
             {
-                var allCodes  = await _dbContext.PhoneCodes.ToListAsync();
-                var phoneCode = allCodes.FirstOrDefault();
-                if (phoneCode is not null)
-                    await _dbContext.PersonPhones.AddAsync(
-                        new PersonPhone(person.Id, phoneCode.Id, new PhoneNumber(request.Phone), true));
+                await _dbContext.PersonPhones.AddAsync(
+                    new PersonPhone(person.Id, phoneCodeId.Value, new PhoneNumber(normalizedPhone), true));
             }
 
-            if (request.DocumentTypeId.HasValue && !string.IsNullOrWhiteSpace(request.DocumentNumber))
+            if (request.DocumentTypeId.HasValue && normalizedDocumentNumber is not null)
                 await _dbContext.PersonDocuments.AddAsync(
                     new PersonDocument(person.Id, request.DocumentTypeId.Value,
-                        new DocumentNumber(request.DocumentNumber)));
+                        new DocumentNumber(normalizedDocumentNumber)));
 
             await _dbContext.SaveChangesAsync();
 
@@ -118,23 +140,28 @@ namespace Infrastructure.Services
 
             try
             {
+                var (emailUser, emailDomainValue) = ParseEmail(request.Email);
+
+                await EnsureEmailIsAvailableAsync(emailUser, emailDomainValue);
+
+                if (!await _dbContext.PhoneCodes.AnyAsync(x => x.Id == request.PhoneCodeId))
+                    throw new ArgumentException($"Phone code {request.PhoneCodeId} does not exist.");
+
+                await EnsurePhoneIsAvailableAsync(request.PhoneCodeId, request.PhoneNumber.Trim());
+
                 var person = new Person(
                     new PersonFirstName(request.FirstName),
                     new PersonLastName(request.LastName));
                 await _dbContext.Persons.AddAsync(person);
                 await _dbContext.SaveChangesAsync();
 
-                var (emailUser, emailDomainValue) = ParseEmail(request.Email);
                 var emailDomain = await GetOrCreateEmailDomainAsync(emailDomainValue);
                 await _dbContext.PersonEmails.AddAsync(
                     new PersonEmail(person.Id, emailDomain.Id, new EmailUser(emailUser), true));
 
-                if (!await _dbContext.PhoneCodes.AnyAsync(x => x.Id == request.PhoneCodeId))
-                    throw new ArgumentException($"Phone code {request.PhoneCodeId} does not exist.");
-
                 await _dbContext.PersonPhones.AddAsync(
                     new PersonPhone(person.Id, request.PhoneCodeId,
-                        new PhoneNumber(request.PhoneNumber), true));
+                        new PhoneNumber(request.PhoneNumber.Trim()), true));
 
                 await _dbContext.SaveChangesAsync();
 
@@ -258,6 +285,62 @@ namespace Infrastructure.Services
                 await _dbContext.SaveChangesAsync();
             }
             return domain;
+        }
+
+        private async Task EnsureEmailIsAvailableAsync(string emailUser, string emailDomain)
+        {
+            var allEmails = await _dbContext.PersonEmails
+                .Include(x => x.EmailDomain)
+                .ToListAsync();
+
+            var emailExists = allEmails.Any(x =>
+                x.EmailUser.Value.Equals(emailUser, StringComparison.OrdinalIgnoreCase) &&
+                x.EmailDomain.Domain.Value.Equals(emailDomain, StringComparison.OrdinalIgnoreCase));
+
+            if (emailExists)
+                throw new InvalidOperationException($"Email '{emailUser}@{emailDomain}' is already registered.");
+        }
+
+        private async Task<int> GetDefaultPhoneCodeIdAsync()
+        {
+            var phoneCode = await _dbContext.PhoneCodes
+                .OrderBy(x => x.Id)
+                .FirstOrDefaultAsync();
+
+            return phoneCode?.Id
+                ?? throw new InvalidOperationException("No phone codes are configured for customer registration.");
+        }
+
+        private async Task EnsurePhoneIsAvailableAsync(int phoneCodeId, string phoneNumber)
+        {
+            var normalizedPhone = phoneNumber.Trim();
+            var allPhones = await _dbContext.PersonPhones.ToListAsync();
+
+            var phoneExists = allPhones.Any(x =>
+                x.PhoneCodeId == phoneCodeId &&
+                x.PhoneNumber.Value.Equals(normalizedPhone, StringComparison.OrdinalIgnoreCase));
+
+            if (phoneExists)
+                throw new InvalidOperationException($"Phone '{normalizedPhone}' is already registered.");
+        }
+
+        private async Task EnsureDocumentTypeExistsAsync(int documentTypeId)
+        {
+            if (!await _dbContext.DocumentTypes.AnyAsync(x => x.Id == documentTypeId))
+                throw new ArgumentException($"Document type {documentTypeId} does not exist.");
+        }
+
+        private async Task EnsureDocumentIsAvailableAsync(int documentTypeId, string documentNumber)
+        {
+            var normalizedDocumentNumber = documentNumber.Trim();
+            var allDocuments = await _dbContext.PersonDocuments.ToListAsync();
+
+            var documentExists = allDocuments.Any(x =>
+                x.DocumentTypeId == documentTypeId &&
+                x.DocumentNumber.Value.Equals(normalizedDocumentNumber, StringComparison.OrdinalIgnoreCase));
+
+            if (documentExists)
+                throw new InvalidOperationException($"Document '{normalizedDocumentNumber}' is already registered.");
         }
 
         private async Task<Vehicle> CreateVehicleAsync(RegisterVehicleRequest request)

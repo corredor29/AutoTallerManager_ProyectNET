@@ -8,7 +8,7 @@ namespace Application.Requests.Vehicles
         public int? FuelTypeId { get; init; }
         public int? TransmissionTypeId { get; init; }
 
-        [Range(1886, short.MaxValue)]
+        [Range(1886, 2026)]
         public short Year { get; init; }
 
         [Range(0, int.MaxValue)]

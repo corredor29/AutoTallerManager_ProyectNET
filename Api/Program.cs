@@ -188,12 +188,13 @@ builder.Services.AddCors(options =>
                 "http://localhost:5500",
                 "http://127.0.0.1:5500",
                 "http://localhost:3000",
-                "http://127.0.0.1:3000"
+                "http://127.0.0.1:3000",
+                "https://proyect-net-front.onrender.com"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials()
-            .WithExposedHeaders("Retry-After"); 
+            .WithExposedHeaders("Retry-After");
     });
 });
 

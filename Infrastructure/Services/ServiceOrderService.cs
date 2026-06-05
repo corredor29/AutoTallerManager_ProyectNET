@@ -251,12 +251,15 @@ public sealed class ServiceOrderService : IServiceOrderService
         if (endAt <= startAt)
             throw new ArgumentException("Estimated delivery date must be after the service order start date.");
 
-        var hasConflictingServiceOrder = await _dbContext.ServiceOrders
+        var serviceOrders = await _dbContext.ServiceOrders
+            .Include(x => x.ServiceType)
             .Where(x => x.MechanicId == mechanicId && x.ClosedAt == null)
             .Where(x => !excludeServiceOrderId.HasValue || x.Id != excludeServiceOrderId.Value)
-            .AnyAsync(x =>
-                x.CreatedAt < endAt &&
-                (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType.EstimatedDuration.Value ?? 1)) > startAt);
+            .ToListAsync();
+
+        var hasConflictingServiceOrder = serviceOrders.Any(x =>
+            x.CreatedAt < endAt &&
+            (x.EstimatedDeliveryAt ?? x.CreatedAt.AddHours(x.ServiceType?.EstimatedDuration?.Value ?? 1)) > startAt);
 
         if (hasConflictingServiceOrder)
             throw new InvalidOperationException(
