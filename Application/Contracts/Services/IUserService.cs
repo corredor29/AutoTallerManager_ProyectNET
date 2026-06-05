@@ -10,6 +10,7 @@ namespace Application.Contracts.Services
     public interface IUserService
     {
         Task<IEnumerable<UserDto>> GetAllAsync();
+        Task<IEnumerable<UserDto>> GetActiveMechanicsAsync();
         Task<UserDto?>  GetByIdAsync(int id);
         Task<UserDto>   CreateAsync(CreateUserRequest request);
         Task<bool>  UpdateAsync(int id, UpdateUserRequest request);
