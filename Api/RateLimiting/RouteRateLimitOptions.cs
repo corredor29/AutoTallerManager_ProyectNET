@@ -1,3 +1,5 @@
+using Humanizer;
+
 namespace Api.RateLimiting;
 
 public sealed class RouteRateLimitOptions
@@ -6,6 +8,8 @@ public sealed class RouteRateLimitOptions
 
     public RouteLimit ServiceOrders { get; init; } = new();
     public RouteLimit Parts { get; init; } = new();
+    public RouteLimit Admin {get; init;} =new();
+    public RouteLimit Receptionist {get; init;} =new();
 }
 
 public sealed class RouteLimit

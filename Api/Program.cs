@@ -177,6 +177,26 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit           = rateLimitOptions.Parts.QueueLimit,
                 AutoReplenishment    = true
             }));
+    options.AddPolicy("Admin", _ =>
+        RateLimitPartition.GetFixedWindowLimiter("Admin", _
+         => new FixedWindowRateLimiterOptions
+         {
+                PermitLimit          = rateLimitOptions.ServiceOrders.PermitLimit,
+                Window               = TimeSpan.FromMinutes(rateLimitOptions.ServiceOrders.WindowMinutes),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit           = rateLimitOptions.ServiceOrders.QueueLimit,
+                AutoReplenishment    = true  
+         }));
+    options.AddPolicy("Receptionist", _ =>
+        RateLimitPartition.GetFixedWindowLimiter("Receptionist",_
+        => new FixedWindowRateLimiterOptions
+        {
+                PermitLimit          = rateLimitOptions.ServiceOrders.PermitLimit,
+                Window               = TimeSpan.FromMinutes(rateLimitOptions.ServiceOrders.WindowMinutes),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit           = rateLimitOptions.ServiceOrders.QueueLimit,
+                AutoReplenishment    = true                 
+        }));
 });
 
 builder.Services.AddCors(options =>
